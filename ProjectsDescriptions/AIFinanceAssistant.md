@@ -1222,3 +1222,100 @@ with tab4:
 with st.expander("🛠️ Debug: Raw LangGraph State"):
     st.json(state)
 ```
+
+---
+
+### 11. [STRETCH] MCP Server Implementation:
+---
+### `1. Build Model Context Protocol server`
+
+#### 🎯 Objective
+Enable structured interop between natural language input (Claude Desktop) and LangGraph stateful execution by building an **MCP (Model Context Protocol) Server**.
+
+The MCP server:
+
+- Accepts structured JSON payloads extracted from LLM input (Claude, etc.)
+- Translates them into valid LangGraph-compatible state
+- Invokes LangGraph graph with this state
+- Returns structured output to UI/agent
+
+#### 🛠️ Example: FastAPI Endpoint
+
+```python
+from fastapi import FastAPI, Request
+from finance_graph import finance_graph  # your LangGraph graph
+
+app = FastAPI()
+
+@app.post("/mcp/execute")
+async def execute_from_claude(request: Request):
+    payload = await request.json()
+
+    state = {
+        "next_agent": payload["agent"],
+        **{k: v for k, v in payload.items() if k != "agent"}
+    }
+
+    output = finance_graph.invoke(state)
+    return output
+```
+
+#### 💻 Integrate with Claude Desktop
+
+Claude can generate JSON from natural queries like:
+
+> "How much do I need to invest every month to reach ₹10L in 5 years?"
+
+With the right prompt (e.g., *“Extract structured JSON for LangGraph assistant”*), Claude outputs:
+
+```json
+{
+  "agent": "goal_agent",
+  "goal_details": {
+    "mode": "target_corpus",
+    "target_amount": 1000000,
+    "years": 5,
+    "annual_rate": 12
+  }
+}
+```
+
+#### 🧩 Claude Desktop Plugin or Shortcut Flow
+
+1. Captures user query
+2. Calls MCP server with Claude-generated JSON
+3. Displays returned `agent_response` or redirects to a Streamlit dashboard for visualization
+
+#### 📑 Document Protocol Usage
+
+#### 🔐 API Contract
+
+**POST** `/mcp/execute`
+
+#### 📥 Input JSON
+
+- `agent`: `string` — Name of the agent to invoke  
+- Additional agent-specific parameters:
+  - `goal_details`
+  - `portfolio`
+  - `tickers`
+  - `user_query`
+  - etc.
+
+#### 📤 Output JSON
+
+- `agent_response`: Primary response text  
+- Other agent-specific outputs like:
+  - `goal_plan_result`
+  - `market_analysis`
+  - `portfolio_summary`
+  - etc.
+
+#### ✅ Supported Agent Names
+
+| Agent Name        | Required Keys     |
+|-------------------|------------------|
+| `goal_agent`      | `goal_details`    |
+| `qna_agent`       | `user_query`      |
+| `market_agent`    | `tickers`         |
+| `portfolio_agent` | `portfolio`       |

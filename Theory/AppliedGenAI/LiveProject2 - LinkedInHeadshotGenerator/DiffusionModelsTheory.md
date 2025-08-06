@@ -1,5 +1,3 @@
-markdown# Complete Guide to Diffusion Models
-
 ## What is a Diffusion Model?
 
 Diffusion models are computational models that generate new images through an iterative process, starting from a sample of Gaussian noise. They do this by learning to reverse what's known as a diffusion process.

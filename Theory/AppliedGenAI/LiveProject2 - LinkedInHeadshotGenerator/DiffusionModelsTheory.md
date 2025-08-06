@@ -674,3 +674,28 @@ The key insights that make this possible are:
 What seemed impossible just a few years ago — generating photorealistic images from text descriptions — has become not just possible but accessible to anyone with a computer. The sculptor analogy holds: these models have learned to see the image hidden within the noise, and chip away at it step by step until beauty emerges.
 
 The implications extend far beyond just image generation, as the principles of diffusion are being applied to video, audio, 3D models, and other domains. We're witnessing the emergence of a new paradigm in AI that may well define the next decade of artificial creativity.
+
+## ✅ TL;DR – How Stable Diffusion Generates Images from Text
+
+1. **Prompt**  
+   You write a text prompt like *“a red panda playing guitar”*.
+
+2. **CLIP Text Encoder**  
+   The prompt is converted into a semantic vector (text embedding).
+
+3. **VAE Encoder**  
+   Stable Diffusion doesn't operate in raw pixel space. Instead, it uses a **Variational Autoencoder (VAE)** to encode images into a compressed **latent space**.
+
+4. **Noise Sampling**  
+   A random noise tensor is generated in this latent space (e.g., 64×64×4 instead of 512×512×3).
+
+5. **UNet Denoising with Cross-Attention**  
+   Over 20–50 steps, a **UNet** denoises the image using:
+   - The current noisy latent
+   - The CLIP text embedding (via **cross-attention** to inject prompt meaning)
+
+6. **VAE Decoder**  
+   The final denoised latent is decoded back to a full-resolution image using the **VAE decoder**.
+
+7. **Output**  
+   You get a realistic image that matches your prompt — e.g., a red panda with a guitar.

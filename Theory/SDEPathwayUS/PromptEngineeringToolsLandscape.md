@@ -330,3 +330,159 @@ filled_prompt = template.format(language="French", sentence="Hello, how are you?
 To go beyond static templates, you'll want **Prompt Composition (Level 3)** — where templates can be assembled, parameterized, and used dynamically in branching logic or workflows.
 
 #### [How Microsoft defends against indirect prompt injection attacks](https://msrc.microsoft.com/blog/2025/07/how-microsoft-defends-against-indirect-prompt-injection-attacks/)
+
+---
+
+## 🏗️ Level 3: Prompt Composition
+
+### 🧩 What They Are
+
+Prompt composition is about combining multiple prompt templates into larger, modular systems.  
+Instead of one giant prompt, you break it into smaller pieces (modules) and assemble them into workflows.  
+
+"Prompt composition = modular building blocks of prompts."
+
+This makes prompts reusable, testable, and maintainable, much like functions in programming.  
+
+---
+
+### 🧠 Core Idea
+
+"Compose small, reusable prompts into bigger workflows."  
+
+Just as software engineers don’t hardcode everything in one function, prompt engineers modularize instructions and connect them to form a pipeline.  
+
+---
+
+### 🔧 Examples
+
+#### 🧾 Example 1: Modular QA System
+
+```
+[Prompt 1: Rewriter]
+Rewrite the user question to make it precise and unambiguous: {question}
+
+[Prompt 2: Knowledge Query]
+Based on the rewritten question, search the knowledge base for relevant content.
+
+[Prompt 3: Answer Generator]
+Using the knowledge content: {retrieved_text}, answer the user’s question clearly.
+```
+
+---
+
+#### 📝 Example 2: Role Split Composition
+
+```plaintext
+[Prompt A: Critic]
+Evaluate the clarity and tone of this draft: {draft}
+
+[Prompt B: Improver]
+Rewrite the draft in a clearer and friendlier way, considering Critic’s feedback: {critic_feedback}
+```
+
+---
+
+#### 🛠️ Example 3: With LangChain (Python)
+
+```python
+from langchain.prompts import PromptTemplate
+from langchain.chains import SequentialChain, LLMChain
+
+rewrite_template = PromptTemplate.from_template("Rewrite this question: {question}")
+rewrite_chain = LLMChain(llm=llm, prompt=rewrite_template, output_key="rewritten")
+
+search_template = PromptTemplate.from_template("Find relevant knowledge for: {rewritten}")
+search_chain = LLMChain(llm=llm, prompt=search_template, output_key="knowledge")
+
+answer_template = PromptTemplate.from_template(
+    "Answer the question '{rewritten}' using: {knowledge}"
+)
+answer_chain = LLMChain(llm=llm, prompt=answer_template, output_key="answer")
+
+pipeline = SequentialChain(
+    chains=[rewrite_chain, search_chain, answer_chain],
+    input_variables=["question"],
+    output_variables=["answer"]
+)
+```
+
+---
+
+### 🧰 Common Use Cases
+
+| Use Case                    | Composition Example                         |
+|-----------------------------|---------------------------------------------|
+| Multi-step QA               | Rewrite → Retrieve → Answer                 |
+| Content generation pipeline | Outline → Expand sections → Proofread → Format |
+| Code generation             | Describe → Generate code → Write tests → Review |
+| Multi-role feedback loops   | Author → Critic → Editor                     |
+| Structured reasoning        | Break problem → Solve subproblems → Merge answers |
+
+---
+
+### 💡 Benefits
+
+| Feature       | Benefit                                               |
+|---------------|-------------------------------------------------------|
+| Modularity    | Easier to debug, reuse, and maintain prompts          |
+| Reusability   | Prompts can be shared across pipelines                |
+| Transparency  | Each step is interpretable (vs. giant monolithic one) |
+| Composability | Works well with logic/branching (if/else, retries)    |
+
+---
+
+### 🔥 Best Practices
+
+- Keep prompts small and focused  
+  One prompt = one role/task. Avoid “do everything” prompts.  
+
+- Name your modules clearly  
+  Example: `QuestionRewriter`, `ContentSummarizer` — not `Prompt1`, `Prompt2`.  
+
+- Test submodules independently  
+  Debug each step before combining them.  
+
+- Add guardrails between steps  
+  Validate outputs (format, length, JSON validity) before passing forward.  
+
+- Log intermediate results  
+  Helps with observability and error tracing.  
+
+---
+
+### ⚙️ Tools and Libraries
+
+| Tool                  | Usage                                          |
+|-----------------------|-----------------------------------------------|
+| LangChain             | SequentialChain, RouterChain, map-reduce flows |
+| PromptOps             | Composition and version control of prompts     |
+| Returne / Promptable  | Modular pipelines                              |
+| ChainForge            | Visual prompt chaining experiments             |
+| Jinja2 + Custom Code  | Lightweight manual composition                 |
+
+---
+
+### 🔒 Limitations
+
+- Still lacks contextual memory (doesn’t remember across sessions unless managed manually).  
+- Can become brittle if one module produces unexpected output.  
+- Complexity grows fast — pipelines can become hard to manage without tooling.  
+- Not autonomous — still requires human-defined flow.  
+
+---
+
+### 🧭 When to Use
+
+| Situation                        | Should Use? |
+|---------------------------------|--------------|
+| Building reusable NLP pipelines | Yes          |
+| Multi-step reasoning workflows  | Yes          |
+| Context-rich assistants         | No           |
+| Long-running conversations      | No           |
+
+---
+
+### 🧗 From Here to Next Level
+
+Once you’re composing prompts into pipelines, the next step is Contextual Prompts (Level 4) — where prompts dynamically adapt based on chat history, documents, or external signals.

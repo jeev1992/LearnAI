@@ -63,8 +63,6 @@ Take 15 seconds. Think about your daily work. What AI tools are you using? Where
 
 Great answers! I'm hearing things like GitHub Copilot, ChatGPT for debugging, automated testing tools. Here's what I want to point out: all of these are becoming more AGENTIC. They're moving from 'I suggest code' to 'I write, test, and deploy code.'
 
-Let me give you a real example that happened just last month at Microsoft."
-
 ---
 
 ## SLIDE 7: From AI Tools to Agentic Systems
@@ -72,8 +70,6 @@ Let me give you a real example that happened just last month at Microsoft."
 "This is the fundamental shift we're witnessing right now, and I want to make sure this lands because it's HUGE.
 
 **Agentic AI is shifting software development from tools that assist developers to systems that execute goals autonomously.**
-
-TODO: Don't touch it I'll add two stories about evaluation framework which I vibecoded and also an integration service and also how Github Copilto agentic mode fixed issues on health checks to App services from load balancers in a complicated infrstructure setup.0
 
 Instead of responding to single prompts, agents now **plan, decide, act, observe outcomes, and iterate**. They're not just tools anymore - they're teammates."
 
@@ -108,7 +104,7 @@ That's the shift from tools to agents."
 **Top row - AI-Assisted Software (Human-Driven):**
 Look at this flow: Engineer → Prompt/Request → AI Suggests → Human Decides → Manual Loop
 
-This is what most of you are doing right now with ChatGPT or Copilot:
+This is what we were doing with ChatGPT or GitHub Copilot when it didn't have Agentic mode until a year ago:
 - You: 'Write me a function to validate email addresses'
 - ChatGPT: *generates code*
 - You: 'Hmm, this doesn't handle international domains'
@@ -137,31 +133,23 @@ This is completely different:
 
 You're no longer the orchestrator. You're the goal-setter. The agent figures out HOW."
 
+In the two eternal questions of **building the right product** and **building the product right** we are at a point where we have a very great solution for the second question: to build the product right.
+
 ---
 
 ## SLIDE 10: What Kind of AI Automations Are We Looking At?
 
-"Let me show you something really cool. This is a screenshot from a real tool that writes code autonomously, detects errors in real-time, runs tests, and creates pull requests for review.
+"This is a screenshot from GitHub Copilot's Agentic mode that writes code autonomously, detects errors in real-time, runs tests, and creates pull requests for review.
 
-This isn't science fiction. This is happening RIGHT NOW in production at companies like Microsoft, Google, Shopify, and hundreds of startups.
-
-The tool in this image can:
-- Understand a bug report written in plain English
-- Navigate a codebase it's never seen before
-- Identify where the bug is happening
-- Write the fix
-- Test the fix
-- Create a PR
-
-And here's the kicker: it does this with an 80% success rate on real GitHub issues. That means 8 out of 10 times, a human reviewer says 'Yep, this fix is correct. Merging it.'"
+And I am sure most of us are using it RIGHT NOW in production at our workplaces."
 
 ---
 
 ## SLIDE 11: Google's Antigravity IDE
 
-"Now THIS is where things get really wild. This is Google's Antigravity IDE - where multiple AI agents work in the editor and terminal to build apps, test code, and manage workflows inside a development environment.
+"This is Google's Antigravity IDE - where multiple AI agents work in the editor and terminal to build apps, test code, and manage workflows inside a development environment.
 
-Imagine this: You open your IDE. But instead of just you coding, there are THREE agents working alongside you:
+You open your IDE. But instead of just you coding, there are THREE agents working alongside you:
 - **Agent A** is writing your backend code
 - **Agent B** is writing frontend components
 - **Agent C** is writing tests and running them
@@ -174,208 +162,53 @@ Google is using this internally, and they've reported that developers are spendi
 
 ---
 
-## SLIDE 12: AlphaEvolve - Agents That Design and Refine
+## SLIDE 12: Before We Dive Into Agents
 
-"Now let me show you something that even I find almost unbelievable. This is about AlphaEvolve - agents that design and refine full algorithms over time based on performance goals, not just generate boilerplate.
-
-Let me give you a concrete example. Researchers at DeepMind gave this agent a problem: 'Improve the efficiency of a sorting algorithm.'
-
-What happened next is fascinating:
-1. The agent generated 100 different variations of sorting algorithms
-2. It tested each one on thousands of datasets
-3. It measured performance, identified bottlenecks
-4. It combined the best features from different variations
-5. It created NEW variations
-6. It repeated this process for 1000 iterations
-
-The result? It created a sorting algorithm that's 15% faster than anything humans have designed - including quicksort, mergesort, and all the classics you learned in computer science.
-
-But here's what's really mind-blowing: **The algorithm it created uses techniques that human computer scientists didn't think of.** It optimized in ways we wouldn't have considered.
-
-This is agents not just assisting - this is agents innovating."
-
----
-
-## SLIDE 13: [Black Slide - Video Placeholder]
-
-"And at this point, I'd normally show you a demo video of this in action, but since we're live, let me describe what you'd see:
-
-You'd see an agent receive a task like 'Build a real-time chat application.' And then you'd watch - in fast-forward - as it:
-- Sets up the project structure
-- Installs dependencies
-- Writes the WebSocket server
-- Writes the frontend
-- Writes tests
-- Runs tests
-- Finds a bug in the connection handler
-- Fixes the bug
-- Deploys to staging
-
-All in about 4 minutes of real time. No human intervention.
-
-The first time I saw this, I literally paused the video and replayed it because I thought I missed something. Nope. That's just how fast these agents work."
-
----
-
-## SLIDE 14: Before We Dive Into Agents
-
-"Alright, so I've shown you the future. Now let me ask you something:
-
-**How do we get there?**
-
-Before we can build these sophisticated systems, we need to understand the foundations. We need to understand what makes something an 'agent' in the first place.
+"Before we can build these sophisticated systems, we need to understand the foundations. We need to understand what makes something an 'agent' in the first place.
 
 So let's take a quick look at what this course will cover."
 
 ---
 
-## SLIDE 15: Agentic AI Program Structure
+## SLIDE 13: Agentic AI Program Structure
 
-"Here's our roadmap. Let me walk you through this because it's designed very intentionally.
+"Here's our roadmap. Let me walk you through this because it's designed very intentionally. Every week, we intend to land the concepts while working through one or more projects so that you're not just seeing theory, but also doing hands on.
 
 **Week 0-1-2: Foundations of Agentic AI**
-This is where we are right now. We're learning:
-- What agents are fundamentally
-- LLMs: Prompts, Roles/Roles, Reasoning
-- Tool Calling: How LLMs interact with the world
-- Conversational Agents
+- Week 0: Pre-Program Foundations: Python Essentials – This is something you'll need to tackle on your own. It's a prerequisite for understanding Python, as it has become the de facto language for building agentic systems. In fact, Microsoft leadership has encouraged all engineers to start learning and using Python if they want to stay competitive in this field. Despite Microsoft’s strong emphasis on .NET, the push to learn Python speaks volumes about its growing importance. Since we are all engineers here, I trust that you believe in being language-agnostic and are capable of handling this independently. That's why we refer to it as Week 0. In Computer Science, we don't start counting from 1 — we start from 0.
+- Week 1: Agentic AI Foundations: Here we talk about evolution of agents from Reflex -> Goal -> Utility agents, modular architecture, prompting techniques, tool calling logic etc. We would build two agents here: one a CRM lead qualifier agent and another a FAQ Agent. This is what we will do today.
+- Week 2 is all about RAG pipelines: We will Understand the concept of Embeddings, chunking strategies, vector stores, indexing strategies, Agentic RAG, Evaluations of RAG pipelines using metrics like precision, recall, response completeness etc, and also build a RAG working RAG pipeline. All of this using frameworks like Langchain, LlamaIndex, Langsmith etc.
 
 **Week 3-4-5: Intelligent Interaction & Reasoning**
 This is where we level up:
-- Multi-Agent Systems (agents working together)
-- Long-Term Memory & RAG (agents that remember)
-- Advanced Reasoning
-- Guardrails & Security
+- Week 3: Multi-Agent Systems: Agent orchestration frameworks like LangGraph. We will build a AI Research Team work project.
+- Week 4: Conversational Agents: Memory systems, voice I/O integration, and multimodal pipelines. The project here we build is a Research Assistant.
+- Week 5: Agent Protocols: Standards for agent messaging, workflow design, and asynchronous communication. The project here focuses on building a Negotiation System between two agents, and frameworks that we will explore are Google ADK and LangGraph.
 
-**Week 6-7-8: Real-World Intelligence & Deployment**
+**Week 6-7: Real-World Intelligence & Deployment**
 This is where we ship to production:
-- Vertical Agents (specialized for specific domains)
-- Real-world use cases
-- Frameworks & Orchestration
-- Deployment strategies
+- Week 6: Vertical Agents: API integrations, OAuth, structured workflows, and hybrid systems. The project is Price Comparison Agent.
+- Week 7: Summarization & Recommendations: Text summarization, ranking systems, and recommendation dashboards. The project is Smart Recommender.
 
-**Week 9-10-11: Optimization, Safety & Enterprise Deployment**
+**Week 8-9-10-11: Optimization, Safety & Enterprise Deployment**
 This is where we make it enterprise-ready:
-- Evaluation & Monitoring
-- Fine-tuning
-- Safety & Ethics
-- Enterprise patterns
+- Week 8: Safe Agents: Guardrails, observability, and cost monitoring. The project here is the Safe Support Agent.
+- Week 9: Fine-Tuning: Custom training pipelines and deployment strategies. The project is about building a Fine-Tuned Agent for a particular domain.
+- Week 10 & 11: These two weeks will be where you will apply all the knowledge gained and build end-to-end systems with multi-agent architecture and cloud deployment.
 
-Each week builds on the previous. By Week 11, you'll have built multiple production-ready agentic systems."
-
----
-
-## SLIDE 16: What You've Been Doing So Far with LLMs & Functions
-
-"Now before we dive into NEW concepts, let's talk about what you're ALREADY doing. Because I guarantee, many of you are using AI in ways that are more 'agentic' than you realize."
+Each week builds on the previous. By Week 11, you'll have a solid grasp on building agentic systems."
 
 ---
 
-## SLIDE 17: Everyday Workflows Powered by LLMs (ChatGPT)
-
-"Let me walk through the five main things people are using LLMs for right now in software development:
-
-**1. Coding & Refactoring:** Generate code, autocomplete, fix errors
-How many of you use Copilot daily? *[show of hands]* Yeah, that's what I thought. Me too. I use it constantly for boilerplate code.
-
-**2. Testing & Debugging:** Auto-create unit tests, find bugs
-Last week I asked ChatGPT: 'Write unit tests for this authentication function.' It gave me 50 test cases in 30 seconds. Would've taken me hours to write those manually.
-
-**3. Docs & Summaries:** Document functions, summarize code
-I inherited a 5000-line legacy codebase. I fed chunks of it to ChatGPT and asked 'What does this do?' It explained it better than the original developer could have.
-
-**4. Code Review:** Analyze PRs, suggest improvements
-GitHub Copilot can now review your pull requests and suggest edge cases you missed. It caught a race condition in my code last month that three human reviewers missed.
-
-**5. Automation:** Serverless scripts, CI/CD pipelines, ChatOps bots
-I used ChatGPT to generate all my AWS Lambda functions for a deployment pipeline. Saved me probably 10 hours of writing boilerplate."
-
----
-
-## SLIDE 18: Everyday Use in Software Workflows
-
-"Now let me get specific about the tools you might already be using:
-
-**AI coding inside IDEs:**
-- GitHub Copilot - you're probably using this
-- Claude Code - really good for refactoring
-- Cursor - this one's amazing for natural language coding
-
-**Automated unit test generation:**
-- Copilot can do this now
-- CodiumAI specializes in this
-- ChatGPT if you paste your code
-
-**Documentation creation:**
-- ChatGPT for code explanations
-- Notion AI for writing docs
-- Mintlify AI for API documentation
-
-**LLM powered code analysis in pull requests:**
-- GitHub Copilot PR reviews
-- Qodo AI
-- Snyk DeepCode AI for security
-
-**Function Driven Automation in Practice:**
-
-This is where it gets interesting. You're already combining LLMs with functions:
-
-- **Serverless workflows:** AWS Lambda with LLM-generated scripts
-- **CI pipelines:** GitHub Actions triggered by LLM logic
-- **Chat ops bots:** Slack bots powered by OpenAI APIs
-
-Let me give you a real example from my team. We have a Slack bot that:
-- Listens for messages like 'Deploy version 2.5 to staging'
-- Uses an LLM to parse that intent
-- Calls our deployment API
-- Monitors the deployment
-- Reports back to Slack with status
-
-That's an agent. We just didn't call it that."
-
----
-
-## SLIDE 19: Workflows You May Not Have Realized Were LLM Driven
-
-"Here's where I'm going to blow your mind a little. You're already using agentic systems without realizing it.
-
-**Automated bug fixing using research tools like SWE Agent and AutoCodeRover:**
-Remember those GitHub issues I mentioned? Tools like SWE Agent are ALREADY deployed on open source repositories. When someone files a bug, the agent tries to fix it before a human even looks at it.
-
-**Natural language coding workflows using Cursor and Replit AI:**
-If you're using Cursor, you're typing things like 'add error handling to this function' and it just... does it. That's an agent taking action based on your goal.
-
-**The Hidden Shift Already Happening:**
-- Engineers already combine LLMs with functions and automation tools
-- Intelligence and execution are integrated in daily workflows
-- This paved the way for agentic systems
-
-Here's what's crazy: **You're already working with agents.** We're just making them more powerful, more autonomous, and more reliable."
-
----
-
-## SLIDE 20: The Shift Toward Agentic Systems
+## SLIDE 13 (Cont.): The Shift Toward Agentic Systems
 
 "Let me summarize what we've covered so far:
 
-**Automated Bug Fixing:** Identify & fix errors with LLMs like ChatGPT
-→ You're doing this when you paste errors into ChatGPT
-
-**Natural Language Coding:** Write code and scripts using prompts
-→ You're doing this with Copilot and Cursor
-
-**The Hidden Shift:**
-→ LLMs + functions = daily workflow integration
-→ Intelligence + execution working together
-→ Foundation for agentic systems
-
-**This shift marks the transition to Agentic AI Systems.**
-
-We went from 'AI suggests' to 'AI executes.'
+We have gone from from 'AI suggests' to 'AI executes.'
 
 And that's exactly what we're going to learn to build today.
 
-**Let me show you a concrete example of this evolution using an HR Assistant - and I'm going to show you THREE versions of this system to really nail down what makes something agentic.**
+**Let me give you an intuition of this evolution using an HR Assistant - and I'm going to show you THREE versions of this system to really nail down what makes something agentic.**
 
 We want to build an HR assistant that can help employees. Let's see how this evolves:
 
@@ -474,7 +307,7 @@ You gave it a goal with constraints. It figured out the plan and executed it.
 
 ---
 
-## SLIDE 21: What You'll Be Learning Today
+## SLIDE 14: What You'll Be Learning Today
 
 "Alright, let's take a breath. That was a lot of context. Now I want to outline exactly what we're covering today."
 

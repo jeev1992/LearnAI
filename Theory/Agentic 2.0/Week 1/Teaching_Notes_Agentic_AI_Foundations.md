@@ -2217,7 +2217,7 @@ When we come back, we're going to get hands-on. We'll write actual code to build
 
 ---
 
-## SLIDE 76: Today's Agenda
+## SLIDE 58: Today's Agenda
 
 "Alright everyone, welcome back from the break! Let's quickly review where we are in today's agenda.
 
@@ -2237,18 +2237,13 @@ Look at this slide showing our four sections with breaks in between:
 - This is where we are now - diving deep into how LLMs become agents
 - This is the most exciting part!
 
-**BREAK** (Coming up)
-
-**Section 4:** Q & A
-- We'll wrap up with your questions
-
 **We're in Section 3 now - the core of modern agentic AI. This is where everything comes together.**
 
 Let's dive in!"
 
 ---
 
-## SLIDE 77: Enter the Agent
+## SLIDE 59: Enter the Agent
 
 "Now we get to the transformation moment.
 
@@ -2284,7 +2279,7 @@ Let me show you what this looks like..."
 
 ---
 
-## SLIDE 78: What is an AI Agent?
+## SLIDE 60: What is an AI Agent?
 
 "Let me give you the formal definition.
 
@@ -2337,7 +2332,7 @@ You give it a goal, and it figures out how to achieve it. You don't tell it ever
 
 ---
 
-## SLIDE 79: The Cognitive Engine
+## SLIDE 61: The Cognitive Engine
 
 "Let me break down how this actually works inside an agent.
 
@@ -2387,7 +2382,7 @@ This flexibility is what makes agents so powerful - and so different from tradit
 
 ---
 
-## SLIDE 80: The ReAct Loop
+## SLIDE 62: The ReAct Loop
 
 "Welcome back! Now we're getting to the MOST IMPORTANT pattern in modern agentic AI.
 
@@ -2438,7 +2433,7 @@ This is incredibly powerful because it means the agent can:
 
 ---
 
-## SLIDE 81: Anatomy of an Agent
+## SLIDE 63: Anatomy of an Agent
 
 "Now let me show you the internal architecture of a functional agent.
 
@@ -2494,7 +2489,7 @@ Without tools, it can't take actions.
 
 ---
 
-## SLIDE 82: The Three Pillars of Agency
+## SLIDE 64: The Three Pillars of Agency
 
 "Let me simplify this even further. Every agent fundamentally needs three things.
 
@@ -2550,7 +2545,7 @@ An LLM alone is like a brilliant professor locked in a library from 2023.
 
 ---
 
-## SLIDE 83: Extending Capabilities with Tools
+## SLIDE 65: Extending Capabilities with Tools
 
 "Let's dive deeper into tools because this is where agents become truly powerful.
 
@@ -2608,7 +2603,7 @@ With tools, an agent can ACTUALLY DO things.
 
 ---
 
-## SLIDE 84: Memory: Short vs. Long Term
+## SLIDE 66: Memory: Short vs. Long Term
 
 "Now let's talk about memory, because this is crucial for agents that work over extended periods.
 
@@ -2667,7 +2662,7 @@ The agent can say: 'I see you had a similar issue last month that was resolved b
 
 ---
 
-## SLIDE 85: Planning & Reasoning
+## SLIDE 67: Planning & Reasoning
 
 "Now let me show you two advanced techniques that make agents even more powerful:
 
@@ -2708,7 +2703,7 @@ This makes agents much more robust in real-world scenarios where things don't al
 
 ---
 
-## SLIDE 86: The Future: Multi-Agent Systems
+## SLIDE 68: The Future: Multi-Agent Systems
 
 "Before we get to implementation, I want to show you where this is all heading.
 
@@ -2773,7 +2768,7 @@ Imagine:
 
 ---
 
-## SLIDE 87: You've learned what agents can do. Now let's learn how to design them for real-world applications.
+## SLIDE 69: You've learned what agents can do. Now let's learn how to design them for real-world applications.
 
 "Perfect transition point. We've covered the theory. Now let's get practical.
 
@@ -2804,7 +2799,7 @@ Let's dive into agentic design patterns!"
 
 ---
 
-## SLIDE 88: Agentic design Pattern
+## SLIDE 70: Agentic design Pattern
 
 "Here's the framework for building production-grade agents.
 
@@ -2855,7 +2850,7 @@ But know that these patterns can be combined and layered to create sophisticated
 
 ---
 
-## SLIDE 89: Reflection Pattern
+## SLIDE 71: Reflection Pattern
 
 "Let me quickly show you one powerful pattern: Reflection.
 
@@ -2916,7 +2911,7 @@ This pattern dramatically increases output quality, especially for:
 
 ---
 
-## SLIDE 90: Routing - A Core Pattern
+## SLIDE 72: Routing - A Core Pattern
 
 "Here's one more critical pattern I want to show you:
 
@@ -2960,7 +2955,7 @@ This is how companies like Intercom, Zendesk, and Shopify build their AI support
 
 ---
 
-## SLIDE 91: Routing
+## SLIDE 73: Routing
 
 "Let me show you a detailed routing implementation.
 
@@ -3003,7 +2998,7 @@ This pattern is fundamental to building sophisticated agents that can handle div
 
 ---
 
-## SLIDE 92: Routing Mechanisms
+## SLIDE 74: Routing Mechanisms
 
 "Let me show you the different ways to implement routing.
 
@@ -3069,7 +3064,7 @@ Example:
 
 ---
 
-## SLIDE 93: LLM as a Router
+## SLIDE 75: LLM as a Router
 
 "Let me show you a practical example of LLM-based routing.
 
@@ -3118,7 +3113,7 @@ Example:
 
 ---
 
-## SLIDE 94: Let's build a CRM Lead qualifier agent using an LLM as the router
+## SLIDE 76: Let's build a CRM Lead qualifier agent using an LLM as the router
 
 "Now we're going to put all this theory into practice. Let me walk you through a REAL production-grade agent design. This isn't a toy example - this is how you'd actually build and deploy an agent in a company.
 
@@ -3530,7 +3525,7 @@ The agent autonomously deciding which tools to call, in what order, without any 
 
 ---
 
-## SLIDE 95: Questions?
+## SLIDE 77: Questions?
 
 "Alright, we've covered a TON of material. Before we jump into the hands-on project, let's pause for questions.
 
@@ -3571,7 +3566,7 @@ Depends on the use case:
 
 ---
 
-## SLIDE 96: Now that the agent is built, we package the project with a clear README and publish it to our GitHub portfolio.
+## SLIDE 78: Now that the agent is built, we package the project with a clear README and publish it to our GitHub portfolio.
 
 "Perfect! So we've built this amazing CRM Lead Qualifier agent. But building it is only half the battle.
 
@@ -3883,7 +3878,7 @@ Not just code that works - but code that's:
 
 ---
 
-## SLIDE 97: Build → Document → Publish (Every Agent)
+## SLIDE 79: Build → Document → Publish (Every Agent)
 
 "Let me make this crystal clear. This is the workflow we'll follow for EVERY project in this course.
 
@@ -3927,7 +3922,7 @@ We're not just building projects - we're building your career portfolio."
 
 ---
 
-## SLIDE 98: Week 0 - Mini Project
+## SLIDE 80: Week 0 - Mini Project
 
 "Alright, now let's get our hands dirty with your first agent project.
 
@@ -4103,7 +4098,7 @@ Watch how the agent automatically figures out which file contains the answer!
 
 ---
 
-## SLIDE 99: Mini Project: Hello Agent – CSV FAQ Agent
+## SLIDE 81: Mini Project: Hello Agent – CSV FAQ Agent
 
 "Here's your first project.
 
@@ -4147,7 +4142,7 @@ Agent: *[Searches CSV]* 'I don't see any information about parking policies in t
 
 ---
 
-## SLIDE 100: Mini Project: Hello Agent – CSV FAQ Agent
+## SLIDE 82: Mini Project: Hello Agent – CSV FAQ Agent
 
 "Let me give you the detailed requirements.
 
@@ -4197,7 +4192,7 @@ Now let me show you how to build this step by step..."
 
 ---
 
-## SLIDE 101: Hello Agent – CSV FAQ Agent: Solution
+## SLIDE 83: Hello Agent – CSV FAQ Agent: Solution
 
 "Let me walk you through the solution architecture.
 
@@ -4284,7 +4279,7 @@ while True:
 
 ---
 
-## SLIDE 102: Thank You
+## SLIDE 84: Thank You
 
 "And that's a wrap!
 

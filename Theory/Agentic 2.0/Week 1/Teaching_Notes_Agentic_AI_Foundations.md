@@ -313,7 +313,7 @@ You gave it a goal with constraints. It figured out the plan and executed it.
 
 ---
 
-## SLIDE 22: Today's Agenda
+## SLIDE 15: Today's Agenda
 
 "We've got four main sections, and we'll take breaks between each:
 
@@ -327,13 +327,13 @@ Here we'll bridge from classical AI agents to modern LLM-based agents. We'll tal
 This is where the magic happens. We'll learn the ReAct loop, which is THE fundamental pattern for building modern agents.
 
 **Section 4: Q&A and two projects: CRM Lead Qualifier and Week 0 Mini Project**
-You'll build your own agent - a CSV FAQ Agent. And trust me, this is cooler than it sounds.
+We'll look at code for two different agents - one a CRM Lead Qualifier Agent which demonstrates tool calling by agents, and a FAQ Agent which answers question grounded on data from some CSVs, instead of using it's own general knowledge. 
 
-We'll take 10-minute breaks between each section. Stay hydrated, stretch, grab coffee. This is a marathon, not a sprint."
+Ofcourse we will have Q and A not only in this section but throughout the class. Please keep popping your questions in the chat and I'll answer them whenever I can.
 
 ---
 
-## SLIDE 23: Reflex & Goal-based Agents
+## SLIDE 16: Reflex & Goal-based Agents
 
 "Alright, Section 1. Let's start at the very beginning.
 
@@ -343,7 +343,7 @@ That's our journey for the next hour. We're going to build up your intuition for
 
 ---
 
-## SLIDE 24: Evolution of AI Agents
+## SLIDE 17: Evolution of AI Agents
 
 "Look at this diagram. This shows the evolution from simple reflex agents to modern LLM-based agents.
 
@@ -355,7 +355,7 @@ Even the most sophisticated LLM agent is still using principles from classical A
 
 ---
 
-## SLIDE 25: What is a Reflex Agent?
+## SLIDE 18: What is a Reflex Agent?
 
 "Let me start with the absolute simplest type of agent. The reflex agent.
 
@@ -398,7 +398,7 @@ These are reflex agents. Simple, fast, but limited."
 
 ---
 
-## SLIDE 26: Reflex Agents - The Mechanism
+## SLIDE 19: Reflex Agents - The Mechanism
 
 "Now let me show you HOW reflex agents work under the hood.
 
@@ -416,27 +416,13 @@ Reflex agents operate on rigid 'If-Then' logic. Look at this loop:
 
 Let me say that again because it's important: **There is NO thinking.** The agent doesn't wonder 'Should I brake? What are my options?' It just matches the condition and fires the action instantly.
 
-Here's what this looks like in code:
-
-```python
-def reflex_agent(perception):
-    if perception == 'red_light':
-        return 'press_brake'
-    elif perception == 'green_light':
-        return 'press_accelerator'
-    elif perception == 'pedestrian_crossing':
-        return 'stop_completely'
-    else:
-        return 'maintain_speed'
-```
-
 That's it. No memory. No planning. Just immediate reaction.
 
 Now you might be thinking: 'That seems too simple to be useful.' And you're partially right. These agents are VERY limited. Which brings us to their critical flaw..."
 
 ---
 
-## SLIDE 27: Reflex Agent's Critical Flaw - Amnesia
+## SLIDE 20: Reflex Agent's Critical Flaw - Amnesia
 
 "This is the most important slide about reflex agents. Pay close attention because this flaw is WHY we need more sophisticated agents.
 
@@ -488,7 +474,7 @@ The amnesia problem is CRITICAL."
 
 ---
 
-## SLIDE 28: The Upgrade - Model-Based Reflex Agents
+## SLIDE 21: The Upgrade - Model-Based Reflex Agents
 
 "So how do we fix this? How do we give agents memory?
 
@@ -518,82 +504,61 @@ Let me show you the self-driving car example fixed:
 - Stay slow and cautious
 - Wait for cyclist to emerge → SAFE
 
-Here's what this looks like in code:
-
-```python
-class ModelBasedReflexAgent:
-    def __init__(self):
-        self.internal_state = {
-            'cyclist_position': None,
-            'last_seen': None,
-            'objects_in_memory': []
-        }
-
-    def act(self, current_perception):
-        # Update memory with what we see NOW
-        if current_perception['cyclist_visible']:
-            self.internal_state['cyclist_position'] = current_perception['cyclist_coords']
-            self.internal_state['last_seen'] = 'now'
-
-        # Make decision based on perception AND memory
-        if self.internal_state['cyclist_position'] is not None:
-            # Cyclist exists even if we can't see them right now
-            return 'slow_down_and_wait'
-        else:
-            return 'proceed_normally'
-```
-
 See the difference? Now the agent has CONTEXT. It has MEMORY.
 
 This is a HUGE upgrade from pure reflex agents. But we're still not at full autonomy. For that, we need to go even further..."
 
 ---
 
-## SLIDE 29: Prerequisites & Environment Setup
+## SLIDE 22: Prerequisites & Environment Setup
 
-"Alright, we've covered reflex agents and model-based reflex agents. Before we move to goal-based agents, let's take a quick 5-minute break.
+"Here is a pre-requisite guide to work with Google Colab Notebooks, like how to add API keys in the secrets manager etc.
 
-Stand up, stretch, grab water. When we come back, we're going to talk about agents that don't just react - they PLAN."
-
-*[5-MINUTE BREAK]*
+We will work mostly with Colab Notebooks in today's class so it maybe helpful for you."
 
 ---
 
-## SLIDE 30: Reflex Agents - Hands-On Notebook
+## SLIDE 23: Reflex Agents - Hands-On Notebook
 
-"Welcome back! Alright, we covered reflex agents in theory before the break. Now I want you to SEE them in action.
+"Alright, we covered reflex agents in theory, now I want you to SEE them in action.
 
-I've prepared a Google Colab notebook that demonstrates everything we just discussed - with working code you can run right now.
+Here is a Google Colab notebook that demonstrates everything we just discussed - with working code you can run right now.
 
 **Link:** https://colab.research.google.com/drive/1NkgRA-YidiyYc-wB6u3oSCzlOPEGTtW6
 
-Here's what you'll find in the notebook:
+The notebook uses a classic 2-room vacuum cleaner example (rooms A and B) to demonstrate two agent types:
 
-**Part 1: Simple Reflex Agent**
-- A vacuum cleaner agent that cleans two rooms (A and B)
-- Uses pure if-then logic: 'If dirty, clean. If clean, move.'
-- You'll see the EXACT problem we discussed: **it gets stuck in an infinite loop** when both rooms are clean
-- It keeps moving Right → Left → Right → Left forever because it has NO memory
+#### Simple Reflex Agent
 
-**Part 2: Model-Based Reflex Agent**
-- The upgraded version with internal memory
-- Keeps track of which rooms it's already cleaned
-- Recognizes when the job is done and STOPS (outputs 'NoOp - Job Done')
-- This is the fix for the amnesia problem!
+| Condition | Action |
+|-----------|--------|
+| Room is dirty | Clean it (`Suction on`) |
+| Room A is clean | Move `Right` to B |
+| Room B is clean | Move `Left` to A |
 
-Take 2 minutes right now - open the notebook, click 'Runtime' → 'Run All', and watch the simulations. You'll literally see the simple agent failing and the model-based agent succeeding.
+**Problem**: No memory. If both rooms are clean, it oscillates forever between them—it can't remember that both are already done.
 
-*[Pause for 2 minutes while students open and run the notebook]*
+#### Model-Based Reflex Agent
 
-Did everyone see it? Notice how the Simple Reflex Agent just keeps going 'Right, Left, Right, Left' even though everything is clean? And then the Model-Based agent says 'Job Done' and stops?
+Adds an **internal model** (dictionary) that tracks the state of both rooms:
 
-That's the power of memory. That's why every modern agent you'll build has some form of state tracking.
+```python
+self.model = {'A': 'Unknown', 'B': 'Unknown'}
+```
 
-Alright, now that you've seen it work, let's talk about the next level of intelligence..."
+**Key improvement**: Before acting, it checks its world model. If both rooms are marked `'Clean'`, it returns `"NoOp (Job Done)"` and stops.
+
+### Key Takeaway
+
+> Even without explicit planning, **adding memory/state** enables much smarter behavior.
+
+This is the foundation for more advanced agents:
+- **Goal-based agents** → plan to achieve objectives
+- **Utility-based agents** → optimize for efficiency/preferences
 
 ---
 
-## SLIDE 31: Goal-Based Agents
+## SLIDE 24: Goal-Based Agents
 
 "**Moving from simple reaction to intelligent planning and strategic foresight.**
 
@@ -605,18 +570,7 @@ That's where goal-based agents come in."
 
 ---
 
-## SLIDE 32: The Paradigm Shift
-
-"Look at this quote on the screen:
-
-**'A goal without a plan is just a wish.'**
-— Antoine de Saint-Exupéry
-
-This perfectly captures the shift we're about to make.
-
-A reflex agent is like having a wish: 'I wish I could avoid obstacles.' It reacts when it sees an obstacle.
-
-A goal-based agent is like having a plan: 'I want to reach the airport. Let me plan the optimal route considering traffic, distance, and time.'
+## SLIDE 25: The Paradigm Shift
 
 **Why reacting to the present is no longer enough.**
 
@@ -636,9 +590,7 @@ In software, this difference is massive. The reflex approach handles the current
 
 ---
 
-## SLIDE 33: Beyond Pure Reaction
-
-"Let me show you the visual comparison:
+## SLIDE 26: Beyond Pure Reaction
 
 **Reflex Agents live in the 'now':**
 - They wait and react
@@ -670,9 +622,9 @@ The goal-based agent has a MAP. The reflex agent is just following signs."
 
 ---
 
-## SLIDE 34: Core Components
+## SLIDE 27: Core Components
 
-"Every goal-based agent has three essential components. Let me break these down:
+"Every goal-based agent has three essential components:
 
 **1. The Goal**
 A description of the desirable situation. Examples:
@@ -704,7 +656,7 @@ Let me show you a real example of these three components working together..."
 
 ---
 
-## SLIDE 35: Example: GPS Navigation
+## SLIDE 28: Example: GPS Navigation
 
 "This is the perfect example because everyone has used GPS.
 
@@ -743,96 +695,9 @@ The agent PLANNED all of this before you even started driving. That's the power 
 
 ---
 
-## SLIDE 36: The Decision Cycle
+## SLIDE 29: Reflex vs. Goal-Based Performance
 
-"Now let me show you the fundamental cycle that every goal-based agent follows. This is THE framework.
-
-Look at these three steps on the screen. This is called **The Decision Cycle**, and it's the heart of how goal-based agents work:
-
-**Step 1: PERCEIVE**
-- Update the current state of the world based on sensors
-- The agent asks: 'Where am I? What's the current situation?'
-- In GPS: Your current location
-- In chess: The current board position
-- In our grid agent: 'I'm at position (0, 0)'
-
-**Step 2: SEARCH**
-- Simulate possible future actions to find a sequence that satisfies the goal
-- The agent asks: 'What are all the possible paths I could take? Which one gets me to my goal?'
-- This is where the PLANNING happens
-- The agent explores different action sequences mentally before committing
-- Uses search algorithms like BFS, DFS, A*, Dijkstra's
-
-**Step 3: ACT**
-- Execute the first action in the identified sequence
-- The agent takes the first step of the plan
-- Then it can loop back to PERCEIVE again (closed-loop) or continue executing (open-loop)
-
-**Why this matters:**
-
-This cycle is what makes goal-based agents intelligent. They don't just react blindly - they:
-1. Understand their current state (PERCEIVE)
-2. Think through possibilities (SEARCH)
-3. Take informed action (ACT)
-
-Think of it like driving:
-- **PERCEIVE:** You see traffic ahead, GPS shows your location
-- **SEARCH:** You mentally evaluate: 'Should I stay on highway? Take exit? Which lane?'
-- **ACT:** You change lanes and take the exit
-
-The key insight: The SEARCH step is where agents become smart. They simulate the future before acting. That's intelligence."
-
----
-
-## SLIDE 37: How They "Think" - Search Algorithms
-
-"Now, the question is: How do agents actually perform that SEARCH step in the Decision Cycle?
-
-This is where search algorithms come in. Let me show you the two main categories:
-
-**Uninformed Search**
-- Explores the environment **blindly** until the goal is found
-- No intelligence, no heuristics, just systematic exploration
-- Two classic algorithms:
-  - **Breadth-First Search (BFS):** Explores all neighbors first, then their neighbors, layer by layer
-  - **Depth-First Search (DFS):** Goes deep into one path, then backtracks
-
-These are **slow, but guaranteed to find a solution if one exists.**
-
-Think of it like searching for your keys:
-- BFS: Check every room on the first floor, then every room on second floor
-- DFS: Start in bedroom, check under bed, in closet, in dresser, exhaust that room completely before moving on
-
-**Informed Search (Heuristic)**
-- Uses **'hints' to estimate the best path** to the goal
-- Much faster because it makes educated guesses
-- The key algorithm: **A* Search**
-
-The A* algorithm balances two things:
-- **g(n):** Cost so far - How much have I spent to get here?
-- **h(n):** Estimated cost to go - How far am I from the goal?
-- **f(n) = g(n) + h(n):** Total estimated cost
-
-This is how GPS works! It doesn't blindly explore every possible road. It estimates which roads are likely to get you to your destination faster based on distance and traffic.
-
-**Example:**
-Imagine you're in New York trying to get to Boston:
-- **Uninformed search:** 'Let me try every road systematically'
-- **A* search:** 'I know Boston is northeast. Let me prioritize roads going northeast and avoid roads going south.'
-
-The informed approach is MUCH faster because it uses knowledge to guide the search.
-
-In real-world agents:
-- Simple environments: Uninformed search works fine
-- Complex environments (millions of possibilities): You NEED informed search
-
-Think about Google Maps calculating routes across an entire country - there are trillions of possible paths. Without A* and heuristics, it would take forever."
-
----
-
-## SLIDE 38: Reflex vs. Goal-Based Performance
-
-"Now let me show you this comparison chart. This is really important because it helps you choose which type of agent to build for your use case.
+"Look at this comparison chart. This is really important because it helps you choose which type of agent to build for your use case.
 
 Look at these three dimensions:
 
@@ -863,130 +728,7 @@ Example:
 
 ---
 
-## SLIDE 39: Real-World Applications
-
-"Let me show you three incredible real-world applications of goal-based agents. These are systems in production TODAY.
-
-**Application 1: Robotics**
-You see the image here - humanoid robots working in warehouses.
-
-Agents like OpenAI-backed Figure robots or Boston Dynamics robots use goal-based planning:
-- **Goal:** Move object from point A to point B
-- **Planning:** Calculate path avoiding obstacles, plan gripper positioning, account for object weight
-- **Execution:** Walk, reach, grasp, carry, place
-
-These robots constantly REPLAN. If someone walks in front of them or an obstacle appears, they don't crash - they calculate a new path.
-
-**Application 2: Autonomous Vehicles**
-Self-driving cars are the ULTIMATE goal-based agents.
-
-- **Goal:** Get passenger safely from home to airport
-- **Planning:** Route planning (like GPS), lane changes, parking spot selection
-- **Execution:** Steering, acceleration, braking
-
-But here's what's interesting - autonomous cars are HYBRID agents:
-- **Reflex layer:** Emergency braking, obstacle avoidance (microsecond reactions)
-- **Goal-based layer:** Route planning, overtaking strategy (seconds to minutes of planning)
-
-The reflex layer keeps you safe. The goal-based layer gets you to your destination efficiently.
-
-**Application 3: Drone Path Planning**
-Look at this image of delivery drones.
-
-Amazon Prime Air, Zipline medical delivery drones - they're all goal-based agents:
-- **Goal:** Deliver package to GPS coordinates
-- **Planning:** Calculate flight path considering:
-  - Weather conditions
-  - No-fly zones
-  - Battery constraints
-  - Obstacles (buildings, trees, power lines)
-- **Execution:** Fly the planned route, adjust for wind
-
-The cool part? They can REPLAN mid-flight. If weather changes or battery runs low, they calculate a new route or identify a safe landing spot.
-
-**What all these have in common:**
-1. Complex environment with many possibilities
-2. Clear goal but no fixed path
-3. Need to adapt to changing conditions
-4. Use search algorithms to find optimal solutions
-
-This is why goal-based agents are transforming robotics, transportation, and logistics. They can handle the messiness of the real world."
-
----
-
-## SLIDE 40: Quote - "A goal without a plan is just a wish."
-
-"I want to come back to this quote by Antoine de Saint-Exupéry. It perfectly captures what we've been learning:
-
-**'A goal without a plan is just a wish.'**
-
-Let that sink in.
-
-In the context of agents:
-- A **reflex agent** has NO goal. It just reacts to stimuli.
-- A **poorly designed agent** has a goal but no planning capability. It wanders aimlessly, hoping to stumble onto the solution.
-- A **good goal-based agent** has BOTH a goal AND the ability to plan a path to reach it.
-
-This is the difference between:
-- 'I want to lose weight' (wish)
-- 'I will go to the gym Monday, Wednesday, Friday at 6am, track calories daily using MyFitnessPal, and aim for 1800 calories' (plan)
-
-The second one is achievable because there's a PLAN.
-
-**For AI agents, planning unlocks autonomy.**
-
-When you give an agent a goal AND planning capability:
-- It doesn't need you to micromanage every step
-- It figures out the sequence of actions on its own
-- It can adapt if the environment changes
-
-That's what makes agents powerful. You define the WHAT (the goal), and the agent figures out the HOW (the plan).
-
-This is the foundation of agentic AI.
-
-Alright, now let's see some code in action..."
-
----
-
-## SLIDE 41: The Future of Agency
-
-"Before we move on, I want you to see where this is all heading. Look at this flowchart on the screen.
-
-We started today talking about **Reactive LLMs** - systems that just do text prediction and pattern completion. That's where ChatGPT started.
-
-**Then we evolved to Goal-Based Agents:**
-- 'What comes next?' → 'What do I need to DO to achieve X?'
-- Reasoning + Planning
-- This is where we are now with tools like AutoGPT, LangChain agents, and Microsoft's Copilot
-
-**Next comes Utility-Based Agents:**
-- 'How do I achieve X?' → 'How do I achieve X in the BEST way?'
-- Optimize for efficiency, cost, user happiness
-- Not just reaching the goal, but reaching it optimally
-
-**Finally, Learning Agents:**
-- 'How do I get better at Y?' → Agents that improve their performance over time
-- They learn from mistakes, adapt strategies, evolve
-- This is the frontier of AI research
-
-Here's what I want you to understand:
-
-**Modern LLMs are evolving from reactive text predictors to goal-directed agents capable of complex reasoning.**
-
-Two years ago, we had ChatGPT answering questions. Today, we have agents that can:
-- Book your entire vacation (flights, hotels, activities)
-- Debug your codebase and suggest fixes
-- Manage your email and calendar autonomously
-
-Tomorrow? Agents that learn your preferences, optimize decisions for your happiness, and get better at their jobs the more they work with you.
-
-This evolution from reactive → goal-based → utility-based → learning is THE trajectory of AI systems.
-
-And everything you're learning today is preparing you to build these systems."
-
----
-
-## SLIDE 42: Goal-based agents
+## SLIDE 30: Goal-based agents
 
 "Alright, we've covered the theory. Now I want to show you code.
 
@@ -1064,23 +806,13 @@ In more advanced systems, you'd use **closed-loop execution:**
 
 GPS does this! It recalculates your route if you miss a turn.
 
-**Now, go ahead and open the notebook.**
-
-Run it. Watch the agent visualize its path as it moves toward the goal. Notice how it doesn't hesitate or backtrack - it KNOWS where it's going because it already planned the route.
-
-Take 2-3 minutes to run it and examine the code.
-
-*[Pause for students to run the notebook]*
-
-Did you see it? That's the power of goal-based thinking. No wasted moves. No random wandering. Just: **Goal → Plan → Execute.**
-
 Now, you might be thinking: 'What if obstacles appear while the agent is moving?' Great question! That's where re-planning comes in, and that's what real-world agents do. They continuously cycle through PERCEIVE → SEARCH → ACT.
 
 For now, the key takeaway: **Goal-based agents plan BEFORE they act. That's what separates them from reflex agents.**"
 
 ---
 
-## SLIDE 43: Instructor Slide - Interactive Discussion
+## SLIDE 31(Cont.): Question - Interactive Discussion
 
 "Alright everyone, before we move forward, I want to hear from YOU.
 
@@ -1114,29 +846,17 @@ Let me give you a starting example to get the discussion going:
 - **Planning:** Analyze error logs, search codebase for root cause, generate fix, test fix
 - **Execution:** Create PR with fix
 
-Who wants to share? What examples come to mind from your work?"
-
-*[Take 5-7 minutes for discussion. Call on 3-4 people.]*
-
-"Great examples, everyone! You're already thinking like agent builders. This is exactly the mindset you need."
-
 ---
 
-## SLIDE 44: Break Time!
+## SLIDE 32: Break Time!
 
 "Alright everyone, let's take a 10-minute break. When we come back, we're diving into LLMs and how they fit into the agent framework.
 
-Stand up, walk around, grab some coffee, check your messages. See you in 10!"
-
-*[10-MINUTE BREAK]*
-
 ---
 
-## SLIDE 45: Today's Agenda (Checkpoint)
+## SLIDE 33: Today's Agenda (Checkpoint)
 
-"Welcome back! I hope you're refreshed. Before we jump into the next section, let me show you where we are in our journey today.
-
-Look at this agenda on the screen:
+"Welcome back!
 
 **Section 1: Reflex & Goal-based Agents** ✅ DONE
 - We just finished this section!
@@ -1144,31 +864,14 @@ Look at this agenda on the screen:
 - You ran two hands-on notebooks
 - You understand the Decision Cycle: Perceive → Search → Act
 
-**Break** ✅ (You just took it!)
-
 **Section 2: Utility Agents and Intro to LLMs** ⏭️ UP NEXT
 - This is where we're going now
 - We'll talk about agents that optimize for the BEST outcomes
 - We'll bridge from classical agents to LLM-powered agents
 
-**Break** (Coming soon!)
-
-**Section 3: LLM-Based Agents** (Later today)
-- The ReAct loop
-- Tool augmentation
-- Multi-step reasoning
-
-**Section 4: Q & A** (End of day)
-- Your questions
-- Deep dives into topics you want to explore
-
-How's everyone feeling? Ready to dive into LLMs and see how they supercharge agents?"
-
-*[Take any quick questions]*
-
 ---
 
-## SLIDE 46: Utility-Based Agents
+## SLIDE 34: Utility-Based Agents
 
 "Alright, we've covered reflex agents and goal-based agents. Now we're moving to the next level of sophistication.
 
@@ -1196,7 +899,7 @@ Let's dive in."
 
 ---
 
-## SLIDE 47: What is a Utility-Based Agent?
+## SLIDE 35: What is a Utility-Based Agent?
 
 "Look at this diagram on the screen. You see a speedometer-like gauge showing different zones from red (bad) to green (good).
 
@@ -1254,7 +957,7 @@ This is what makes utility agents powerful - they consider trade-offs and optimi
 
 ---
 
-## SLIDE 48: Goal vs. Utility Agents
+## SLIDE 36: Goal vs. Utility Agents
 
 "Let me show you this comparison side by side. This really clarifies the difference.
 
@@ -1272,42 +975,9 @@ It's black and white. Either you achieved the goal or you didn't.
 
 It's a spectrum. You're looking for the BEST solution among many valid options.
 
-**Let me give you a concrete example:**
-
-**Scenario:** You're building a robot that cleans warehouse floors.
-
-**Goal-Based Robot:**
-- Goal: Clean the entire warehouse
-- Behavior: Follows any path that covers all areas
-- Result: Warehouse is clean (success!)
-- **Problem:** It might take 4 hours and use excessive battery because it zigzagged inefficiently
-
-**Utility-Based Robot:**
-- Goal: Clean the entire warehouse
-- Utility function: minimize(time) + minimize(battery usage) + maximize(coverage)
-- Behavior: Calculates the optimal path that cleans everything in the least time with least energy
-- Result: Warehouse is clean in 2 hours with 40% battery remaining (optimal!)
-
-See the difference?
-
-**When do you need utility-based agents?**
-
-Use them when:
-1. Multiple solutions exist
-2. Some solutions are better than others
-3. You need to optimize for cost, time, efficiency, or quality
-4. Resources are limited (money, time, energy)
-
-Examples:
-- **Route planning:** Not just 'get there' but 'get there fastest with least gas'
-- **Investment decisions:** Not just 'make money' but 'maximize returns while minimizing risk'
-- **Resource allocation:** Not just 'assign tasks' but 'assign tasks to maximize productivity while minimizing cost'
-
-The bottom line: **Goal-based agents answer 'Can I?' Utility-based agents answer 'What's optimal?'**"
-
 ---
 
-## SLIDE 49: Agent Architecture - The Evaluation Step
+## SLIDE 37: Utility Agent Architecture - The Evaluation Step
 
 "Now let me show you how utility-based agents actually work under the hood. Look at this architecture diagram.
 
@@ -1376,7 +1046,7 @@ The agent picks 60 mph because the utility function prioritizes safety over spee
 
 ---
 
-## SLIDE 50: Real World Example: Navigation
+## SLIDE 38: Real World Example: Navigation
 
 "Let me bring this back to something we all use: GPS routing.
 
@@ -1430,82 +1100,7 @@ A utility-based agent picks Route A (better utility given traffic conditions).
 
 ---
 
-## SLIDE 51: Other Key Applications
-
-"Utility-based agents are everywhere in the modern world. Let me show you three critical applications:
-
-**Application 1: Financial Trading**
-
-Look at this stock trading dashboard. Algorithmic trading systems are utility-based agents.
-
-**The goal:** Make profitable trades
-**The utility function:** Maximize returns while minimizing risk
-
-The agent doesn't just ask 'Will this stock go up?' It asks:
-- How much will it go up?
-- What's the probability?
-- What's the downside risk?
-- How does this fit in my portfolio?
-
-Utility formula:
-```
-utility = expected_return - risk_penalty
-```
-
-The agent balances potential gains against the risk of loss. This is why trading algorithms don't just buy the stock with the highest potential return - they optimize the risk-reward trade-off.
-
-**Application 2: Smart Energy (Smart Grid)**
-
-Look at this smart energy monitoring system. Home energy management systems use utility-based agents.
-
-**The goal:** Manage home energy usage
-**The utility function:** Minimize cost + maintain comfort + prioritize renewable energy
-
-The agent decides:
-- When to charge your electric car (during off-peak hours when electricity is cheap)
-- When to run the dishwasher (at night when rates are low)
-- When to use battery backup vs. grid power
-- When to sell excess solar energy back to the grid
-
-It's constantly balancing:
-```
-utility = (cost_savings * weight) + (user_comfort * weight) + (environmental_impact * weight)
-```
-
-You save money AND reduce carbon footprint, all optimized automatically.
-
-**Application 3: Recommendations**
-
-Look at this e-commerce recommendation panel. Recommendation systems (Netflix, Amazon, Spotify) are utility-based agents.
-
-**The goal:** Recommend content
-**The utility function:** Maximize user engagement + diversity + freshness
-
-The agent doesn't just recommend the most popular items. It optimizes for:
-- **Relevance:** Items you'll probably like
-- **Diversity:** Don't show you the same thing repeatedly
-- **Novelty:** Introduce new content to keep things interesting
-- **Engagement:** Items that will keep you on the platform
-
-Netflix's algorithm might say:
-- Showing 'Stranger Things S5' has utility = 0.9 (you loved previous seasons)
-- Showing 'Generic Action Movie #47' has utility = 0.4 (similar to what you watch, but predictable)
-- Showing 'Quirky Indie Film' has utility = 0.7 (different, but based on your profile, you might love it)
-
-The agent picks recommendations that maximize long-term engagement, not just immediate clicks.
-
-**What all these have in common:**
-
-1. Multiple objectives (cost, time, quality, risk, reward)
-2. Need to balance trade-offs
-3. Optimize for BEST outcome, not just ANY outcome
-4. Operate in complex, real-world environments
-
-Utility-based agents are the workhorses of modern AI systems. Whenever you see optimization happening, there's likely a utility function behind it."
-
----
-
-## SLIDE 52: Utility-based agents
+## SLIDE 39: Utility-based agents
 
 "Before we move on to LLMs and modern agents, I want to show you utility-based agents in action with a hands-on example.
 
@@ -1598,7 +1193,7 @@ This is the foundation of rational decision-making in AI."
 
 ---
 
-## SLIDE 53: Conclusion & Questions
+## SLIDE 40: Conclusion
 
 "Let me wrap up this section on utility-based agents with one key statement:
 
@@ -1625,15 +1220,9 @@ Every time you:
 
 You're experiencing utility-based agents in action.
 
-**Questions?**
-
-Before we transition to LLMs, does anyone have questions about utility-based agents? This is a good checkpoint."
-
-*[Take 2-3 questions]*
-
 ---
 
-## SLIDE 54: Instructor Slide - Interactive Discussion
+## SLIDE 41: Question - Interactive Discussion
 
 "Alright, here's a question I want YOU to think about:
 
@@ -1683,7 +1272,7 @@ Great examples, everyone! You're starting to think like agent builders."
 
 ---
 
-## SLIDE 55: From Words to Action
+## SLIDE 42: From Words to Action
 
 "Alright, now we're transitioning to the most exciting part of this course.
 
@@ -1700,7 +1289,7 @@ But now we're going to talk about something that changed EVERYTHING:
 
 **Large Language Models.**
 
-ChatGPT came out in November 2022. That was less than 3 years ago. And it completely transformed what's possible with AI agents.
+ChatGPT came out in November 2022. That was almost 3 years ago. And it completely transformed what's possible with AI agents.
 
 Before LLMs, agents were:
 - Narrow: Built for specific tasks
@@ -1720,7 +1309,7 @@ That's the journey we're about to take. Buckle up."
 
 ---
 
-## SLIDE 56: What are LLMs?
+## SLIDE 43: What are LLMs?
 
 "Alright, now let's talk about Large Language Models. Look at this diagram on the screen.
 
@@ -1763,7 +1352,7 @@ Let me show you what I mean..."
 
 ---
 
-## SLIDE 57: If LLMs are the engine, prompts are how we steer them
+## SLIDE 44: If LLMs are the engine, prompts are how we steer them
 
 "I love this analogy. Look at the diagram:
 
@@ -1798,7 +1387,7 @@ Let me show you the framework..."
 
 ---
 
-## SLIDE 58: Prompt Engineering
+## SLIDE 45: Prompt Engineering
 
 "Look at this framework for effective prompt engineering. This is a game-changer.
 
@@ -1865,7 +1454,7 @@ This is how you turn LLMs from toys into tools."
 
 ---
 
-## SLIDE 59: Types of Prompts
+## SLIDE 46: Types of Prompts
 
 "Let me show you the evolution of prompting techniques with REAL examples you can copy and use.
 
@@ -2060,7 +1649,7 @@ The more complex your problem, the more sophisticated your prompting technique s
 
 ---
 
-## SLIDE 60: Limitations of LLMs
+## SLIDE 47: Limitations of LLMs
 
 "Before we talk about what LLMs can do as agents, we need to be brutally honest about what they CAN'T do by themselves.
 
@@ -2135,7 +1724,7 @@ The answer? We give them what they're missing..."
 
 ---
 
-## SLIDE 61: What if we gave the LLM tools, memory, and a loop?
+## SLIDE 48: What if we gave the LLM tools, memory, and a loop?
 
 "This is the breakthrough question.
 
@@ -2170,7 +1759,7 @@ Let me show you exactly how this works..."
 
 ---
 
-## SLIDE 62: Agent = loop(prompt + tool + memory)
+## SLIDE 49: Agent = loop(prompt + tool + memory)
 
 "Look at this formula on the screen. This is THE definition of a modern AI agent:
 
@@ -2218,7 +1807,7 @@ Let me show you what agents can actually do..."
 
 ---
 
-## SLIDE 63: Agents with Tools
+## SLIDE 50: Agents with Tools
 
 "Now let's talk about what tools actually give agents. This is where it gets powerful.
 
@@ -2260,7 +1849,7 @@ Let me show you a concrete example..."
 
 ---
 
-## SLIDE 64: Agent's way of solving problems - Example
+## SLIDE 51: Agent's way of solving problems - Example
 
 "Alright, this is one of my favorite examples because it's simple but shows EVERYTHING.
 
@@ -2310,7 +1899,7 @@ Let me show you the architecture behind this..."
 
 ---
 
-## SLIDE 65: Agent's way of solving problems
+## SLIDE 52: Agent's way of solving problems
 
 "Look at this flowchart. This shows the full problem-solving process for an AI agent.
 
@@ -2353,68 +1942,10 @@ AI Agent:
 
 This is why agents can handle messy, real-world problems. They don't just execute a script - they THINK through the problem.
 
-Let me show you the detailed walkthrough..."
-
 ---
 
-## SLIDE 66: Agent's way of solving problems (continued)
 
-"Let me break down the umbrella example in even more detail.
-
-**The Question:** 'I live in Paris. Should I carry an umbrella today if I am going out?'
-
-**What the agent needs to understand:**
-- Two things are needed here
-
-**Thing 1:** Get weather information for Paris
-
-The agent recognizes: 'I don't have weather data. I need to fetch it.'
-
-**Thing 2:** Determine if the user needs an umbrella
-
-The agent recognizes: 'I need to check if rain is expected, then make a recommendation.'
-
-**The agent uses a weather API tool to fetch the weather.**
-
-Not hardcoded. The agent CHOOSES to use this tool based on understanding the question.
-
-**Based on the weather data (e.g., rain expected), the agent decides the next step:**
-
-If rain expected → Recommend bringing umbrella
-If no rain → Recommend not bringing umbrella
-
-**The reasoning:**
-- Check weather data
-- If precipitation > 30% → Yes, bring umbrella
-- If temperature < 5°C and precipitation > 0% → Yes, bring umbrella
-- Otherwise → No umbrella needed
-
-**If it's raining:** Respond, 'Yes, you'll need an umbrella.'
-**If it's not raining:** Respond, 'No, you won't need an umbrella.'
-
-**The agent delivers the final answer.**
-
-'Yes, bring an umbrella! ☂️ Rain is expected today.'
-
-**What makes this agenticseem magical:**
-
-You asked ONE simple question.
-
-But behind the scenes:
-- Agent understood intent
-- Agent identified required information
-- Agent selected appropriate tool
-- Agent executed tool
-- Agent interpreted results
-- Agent formulated response
-
-All autonomous. All in seconds.
-
-This is the power of agents."
-
----
-
-## SLIDE 67: What is an LLM?
+## SLIDE 53: What is an LLM?
 
 "Now let's dive deeper into what LLMs actually are under the hood.
 
@@ -2438,7 +1969,7 @@ Understanding this is crucial for understanding both their power and their limit
 
 ---
 
-## SLIDE 68: The Engine: Transformers
+## SLIDE 54: The Engine: Transformers
 
 "So what makes modern LLMs possible? The answer is: **Transformers**.
 
@@ -2469,229 +2000,7 @@ Without transformers, we wouldn't have the LLMs we have today."
 
 ---
 
-## SLIDE 69: Why We Need More
-
-"So LLMs are powerful. But they're not enough by themselves. Let me show you why.
-
-This slide highlights three critical limitations:
-
-**1. Static Knowledge**
-
-An LLM is frozen in time. It only knows what it learned during training and cannot access real-time news or data.
-
-Example: 'What happened in the news today?' - LLM: 'I don't know. My training data ended in 2023.'
-
-It can't access:
-- Today's stock prices
-- Current weather
-- Your company database
-- Your personal files
-- Anything that happened after its training cutoff
-
-**2. Hallucinations**
-
-Without a way to verify facts, LLMs can confidently present incorrect information as truth.
-
-This is the scariest limitation. The LLM will generate text that SOUNDS authoritative and correct, but is completely made up.
-
-Example: 'Tell me about the history of Company XYZ' - LLM might make up founding dates, CEO names, or products that never existed.
-
-Why? Because it's pattern matching, not fact retrieval. If the pattern looks right, it generates it - even if it's false.
-
-**3. Passive Nature**
-
-Standard LLMs wait for a prompt and generate text. They cannot inherently 'do' things like send emails or query databases.
-
-They're conversational, not operational.
-
-Example: 'Send this report to my team' - LLM: 'I can't send emails, but here's a template you could use...'
-
-**So what's the solution?**
-
-We need to give LLMs:
-- Access to real-time data (tools)
-- Ways to verify information (retrieval)
-- Ability to take actions (function calling)
-
-That's where agents come in. Let me show you..."
-
----
-
-## SLIDE 70: Agent's way of solving problems
-
-"Let's walk through a complete agent problem-solving example. This will tie everything together.
-
-**The Question:** 'I live in Paris. Should I carry an umbrella today if I am going out?'
-
-Look at this breakdown:
-
-**The agent understands that two things are needed:**
-
-**First:** Get weather information for Paris.
-
-The agent recognizes: 'I don't have current weather data. I need to fetch it from an external source.'
-
-**Second:** Determine if the user needs an umbrella.
-
-The agent recognizes: 'I need to analyze the weather data and make a recommendation based on whether rain is expected.'
-
-**The agent uses a weather API tool to fetch the weather.**
-
-This is key - the agent CHOOSES to use this tool. It's not hardcoded to call the weather API. It understands from the question that weather data is needed and selects the appropriate tool.
-
-**Based on the weather data (e.g., rain expected), the agent decides the next step:**
-
-The agent applies reasoning:
-
-**If it's raining:** Respond, 'Yes, you'll need an umbrella.'
-**If it's not raining:** Respond, 'No, you won't need an umbrella.'
-
-But notice - this isn't just an if/else statement. The agent REASONS through it:
-- Check precipitation probability
-- Consider temperature (snow vs rain)
-- Factor in wind conditions
-- Make a human-like recommendation
-
-**The agent delivers the final answer.**
-
-'Yes, bring an umbrella! ☂️ Rain is expected today with 80% probability.'
-
-**What's remarkable here:**
-
-You asked ONE question. But the agent:
-1. Understood the question required external data
-2. Identified which tool to use (weather API, not email API or database API)
-3. Executed the tool call
-4. Interpreted the results
-5. Applied reasoning
-6. Generated a natural language response
-
-All autonomous. All in seconds.
-
-This is agentic AI in action."
-
----
-
-## SLIDE 71: Agent's way of solving problems - Example
-
-"Let me show you the visual flow of how an agent actually solves this problem.
-
-Look at this diagram showing the complete AI Agent Problem-Solving Process:
-
-**Step 1: AI Agent Initiation**
-- AI agent begins its task
-- The journey starts when you ask the question
-
-**Step 2: Problem Identification**
-- AI agent identifies the problem
-- 'User needs weather information and a recommendation about umbrella'
-
-**Step 3: Problem Breakdown**
-- AI agent breaks down the problem
-- 'I need: (a) Current weather data for Paris (b) Logic to determine if umbrella is needed (c) A clear response'
-
-**Step 4: Planning Phase**
-- AI agent plans each step
-- 'Step 1: Call weather API for Paris. Step 2: Parse the response. Step 3: Check if precipitation is expected. Step 4: Generate recommendation.'
-
-**Step 5: Execution of Plan**
-- AI agent executes the plan
-- Actually calls the weather API, gets the data: `{temp: 14°C, condition: 'rain expected'}`
-
-**Step 6: Dynamic Adjustment**
-- AI agent adjusts if needed
-- If API call failed → Try backup weather service
-- If data is unclear → Ask for clarification
-- If successful → Proceed to response
-
-**This is what makes agents different from traditional programs:**
-
-Traditional program:
-```
-if user_asks_about_weather:
-    call_weather_api()
-    return result
-```
-
-Fixed, brittle, no reasoning.
-
-AI Agent:
-```
-understand_question()
-identify_required_information()
-select_appropriate_tools()
-execute_and_verify()
-adapt_if_needed()
-reason_about_results()
-generate_natural_response()
-```
-
-Dynamic, adaptive, intelligent.
-
-The agent doesn't just execute steps - it THINKS through the problem at each stage."
-
----
-
-## SLIDE 72: Agent's way of solving problems
-
-"Look at this flow diagram. This is the complete end-to-end process.
-
-**AI Agent Problem-Solving Process:**
-
-**AI Agent Initiation** → AI agent begins its task
-
-The user comes with a question. The agent activates.
-
-↓
-
-**Problem Identification** → AI agent identifies the problem
-
-'This is a question about weather and a recommendation for action.'
-
-↓
-
-**Problem Breakdown** → AI agent breaks down the problem
-
-'I need weather data. I need to interpret it. I need to provide actionable advice.'
-
-↓
-
-**Planning Phase** → AI agent plans each step
-
-'I'll call the weather API, check precipitation, and recommend accordingly.'
-
-↓
-
-**Execution of Plan** → AI agent executes the plan
-
-Calls `get_weather('Paris')`, receives data, processes it.
-
-↓
-
-**Dynamic Adjustment** → AI agent adjusts if needed
-
-'Did it work? Yes. Do I need more information? No. Am I ready to respond? Yes.'
-
-**The loop can repeat:**
-
-If the agent determines it needs MORE information or a different tool, it can loop back to Planning Phase.
-
-Example:
-- Calls weather API → Gets ambiguous data → Calls a DIFFERENT weather service
-- Calls weather API → Gets error → Tries again with different parameters
-- Gets weather data → Realizes user location is ambiguous → Asks clarifying question
-
-**This is agentic behavior:**
-
-- Self-directed: The agent decides what to do next
-- Adaptive: The agent changes its plan based on results
-- Goal-oriented: The agent keeps working until the problem is solved
-
-Not just automation. Intelligence."
-
----
-
-## SLIDE 73: Calling LLMs via client libs
+## SLIDE 55: Calling LLMs via client libs
 
 "Now let's talk about the practical side - how do you actually build with LLMs?
 
@@ -2840,7 +2149,7 @@ The complexity isn't in calling the API - it's in:
 
 ---
 
-## SLIDE 74: Instructor Slide: What LLM is used in what scenario...
+## SLIDE 56: Question: What LLM is used in what scenario...
 
 "This is a good moment for discussion. Let me pose a question to all of you:
 
@@ -2896,7 +2205,7 @@ Let's take a quick break and come back to build our first agent!"
 
 ---
 
-## SLIDE 75: Break Time!
+## SLIDE 57: Break Time!
 
 "Alright everyone, we've covered a LOT in this section.
 
@@ -2905,10 +2214,6 @@ We went from understanding what LLMs are, to their limitations, to how agents so
 **Let's take a 15-minute break.**
 
 When we come back, we're going to get hands-on. We'll write actual code to build agents.
-
-Grab some coffee, stretch your legs, and we'll reconvene in 15 minutes.
-
-See you soon!"
 
 ---
 

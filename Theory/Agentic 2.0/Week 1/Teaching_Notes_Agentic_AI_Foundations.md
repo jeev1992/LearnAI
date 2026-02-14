@@ -3210,10 +3210,9 @@ Simple automation fails because lead data is:
 ✅ **Reconcile** conflicting signals (mid-tier revenue + high buying intent)
 ✅ **Trigger** human review when confidence falls below threshold
 
-**This is judgment, not automation.**
+#### This is judgment, not automation.
 
 **1. Handling Incomplete & Missing Data**
----
 
 **Why Traditional Automation Fails?**
 

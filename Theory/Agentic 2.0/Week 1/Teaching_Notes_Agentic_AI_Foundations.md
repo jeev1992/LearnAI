@@ -3212,7 +3212,170 @@ Simple automation fails because lead data is:
 
 **This is judgment, not automation.**
 
----
+#### 1. Handling Incomplete & Missing Data
+
+**Why Traditional Automation Fails?**
+
+Rule-based systems assume structured, complete inputs:
+
+Example rule:
+> IF company_size > 200 AND revenue > $50M → High Priority
+
+But real-world lead data often looks like:
+- Revenue → Missing
+- Employee count → Conflicting sources
+- Industry → Unknown
+
+Result:
+- Automation stops
+- Or produces incorrect classification
+An agent can **reason under uncertainty**.
+
+**How an Agent Solves This**
+
+An agent can **reason under uncertainty**.
+
+Example:
+- Domain: acme.ai
+- No revenue data
+- LinkedIn shows ~120 employees
+- Website mentions Series B funding
+
+Agent reasoning:
+> "Based on employee size + funding stage, this is likely a mid-market company. I will estimate company tier and proceed."
+
+If confidence is low:
+> "Request SDR confirmation before scoring."
+
+This ability to **infer and estimate** is uniquely agentic.
+
+#### 2. Reconciling Conflicting Signals
+
+**Why Traditional Automation Fails?**
+
+CRM systems frequently contain contradictory information.
+
+Example:
+- Status: Cold Lead  
+- Recent activity:
+  - Visited pricing page yesterday  
+  - Opened last 3 emails  
+  - Attended webinar  
+
+Rule-based systems cannot determine:
+- Which signal is more important  
+- Whether engagement overrides CRM status  
+
+Result:
+- Incorrect prioritization  
+- Lost high-intent opportunities  
+
+**How an Agent Solves This**
+
+An agent performs **contextual reconciliation**.
+
+Agent reasoning:
+> "Although CRM marks this lead as 'Cold', recent behavioral signals indicate strong buying intent. I will upgrade priority to Warm and flag CRM inconsistency."
+
+This requires:
+- Multi-source reasoning  
+- Signal weighting  
+- Contextual decision-making  
+
+These capabilities are inherently agentic.
+
+#### 3. Deciding When to Involve Humans
+
+**Why Traditional Automation Fails?**
+
+Traditional systems operate in binary mode:
+- Continue blindly  
+- Fail with error  
+
+They cannot dynamically determine:
+- When to ask for clarification  
+- When to escalate decisions  
+
+**How an Agent Solves This**
+
+Agents use **confidence-based decision making**.
+
+Example scenarios:
+
+**High Confidence**
+> "All enrichment data available → Auto-qualify lead."
+
+**Moderate Confidence**
+> "Company domain unclear → Ask SDR to confirm organization."
+
+**Low Confidence / High Risk**
+> "Lead tied to existing enterprise account → Escalate to Account Executive."
+
+This ability to:
+- Self-assess certainty  
+- Decide escalation paths  
+- Collaborate with humans  
+
+is a defining trait of agentic systems.
+
+#### 4. Dynamic Multi-Step Planning
+
+**Why Traditional Automation Fails?**
+
+Workflow tools assume fixed sequences:
+
+Example pipeline:
+1. Fetch CRM data  
+2. Call enrichment API  
+3. Score lead  
+
+If any step fails:
+- Entire process breaks  
+
+These systems cannot adapt to unexpected states.
+
+**How an Agent Solves This**
+
+Agents perform **goal-driven planning**.
+
+Example behavior:
+> "Clearbit returned no enrichment data. I will attempt LinkedIn scraping as an alternative source."
+
+Agent capabilities include:
+- Tool selection  
+- Retry strategies  
+- Adaptive execution paths  
+
+This dynamic planning is impossible in static workflows.
+
+
+#### 5. Synthesizing Contextual Insights (Not Just Data)
+
+**Why Traditional Automation Fails?**
+
+Automation produces raw data outputs:
+
+Example:
+- Revenue: $30M  
+- Industry: FinTech  
+- Page visits: 3  
+
+But SDRs need **actionable insights**, not fragmented data.
+
+**How an Agent Solves This**
+
+Agents generate **contextual, sales-ready summaries**.
+
+Example output:
+> "This mid-market FinTech company is expanding in APAC and recently engaged with compliance-focused content. Recommended outreach should emphasize regulatory automation benefits."
+
+This requires:
+- Context synthesis  
+- Business reasoning  
+- Personalization  
+
+These are cognitive tasks suited for agents.
+
 
 **5. AGENT ROLE, SCOPE & AUTONOMY LEVEL**
 

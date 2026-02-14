@@ -3212,7 +3212,8 @@ Simple automation fails because lead data is:
 
 **This is judgment, not automation.**
 
-#### 1. Handling Incomplete & Missing Data
+**1. Handling Incomplete & Missing Data**
+---
 
 **Why Traditional Automation Fails?**
 

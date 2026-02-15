@@ -2,6 +2,8 @@
 
 This document provides detailed explanations of all six Colab notebooks in the Agentic AI 2.0 Week 1 curriculum. The notebooks progressively build your understanding from basic reflex agents to practical LLM-powered agents.
 
+Each section includes a **step-by-step code walkthrough** showing exactly what happens at each line and iteration, so you can trace the execution yourself.
+
 ---
 
 ## Table of Contents
@@ -67,18 +69,37 @@ class SimpleReflexAgent:
             return "Left"
 ```
 
-#### Critical Limitation
+**Line-by-line breakdown:**
 
-The simple reflex agent has **no memory**. If both rooms are clean, it will endlessly oscillate between them because it cannot recall whether the other room has already been cleaned.
+- `__init__` does nothing (`pass`) — the agent has **zero memory**. It cannot remember what it did before.
+- `decide(self, percept)` receives a tuple `(location, is_dirty)` — the agent's only view of the world.
+- The method is pure if-then logic: dirty → clean, clean at A → go right, clean at B → go left.
+- There is no state tracking, no history, no model of the world.
 
-**Simulation Output:**
+#### Simulation Code & Step-by-Step Walkthrough
+
+```python
+env_state = {'A': True, 'B': False}  # A is Dirty (True), B is Clean (False)
+agent_location = 'A'
+agent = SimpleReflexAgent()
+
+for i in range(4):
+    is_dirty = env_state[agent_location]
+    percept = (agent_location, is_dirty)
+    action = agent.decide(percept)
+    # Update environment based on action...
 ```
-Loc: A | Dirty: False -> Action: Right
-Loc: B | Dirty: False -> Action: Left
-Loc: A | Dirty: False -> Action: Right
-Loc: B | Dirty: False -> Action: Left
-... (infinite loop)
-```
+
+**Setup:** `env_state = {'A': True, 'B': False}` — Room A is **dirty**, Room B is **clean**. Agent starts at `'A'`.
+
+| Step | `agent_location` | `is_dirty` | `percept` | Action | What Happens Next |
+|------|-------------------|-----------|-----------|--------|-------------------|
+| 0 | `'A'` | `True` | `('A', True)` | `"Suction on"` | Cleans A → `env_state['A'] = False`. Agent stays at A. |
+| 1 | `'A'` | `False` | `('A', False)` | `"Right"` | A is now clean, so moves right → `agent_location = 'B'` |
+| 2 | `'B'` | `False` | `('B', False)` | `"Left"` | B is clean, so moves left → `agent_location = 'A'` |
+| 3 | `'A'` | `False` | `('A', False)` | `"Right"` | A is clean, so moves right → `agent_location = 'B'` |
+
+**What's happening:** After the useful work is done in Step 0 (cleaning A), the remaining steps are **wasted oscillation**. Both rooms are clean, but the agent has no memory — it can't tell everything is done. It just keeps bouncing Left/Right forever. This is the fundamental limitation of a simple reflex agent.
 
 ---
 
@@ -99,27 +120,21 @@ To overcome the simple agent's limitations, we introduce a **Model-Based Reflex 
 ```python
 class ModelBasedReflexAgent:
     def __init__(self):
-        # Internal State: Keeps track of the world status
         self.model = {
             'A': 'Unknown',
             'B': 'Unknown'
         }
 
     def update_state(self, location, is_dirty):
-        """Updates internal model based on current percept"""
         self.model[location] = 'Dirty' if is_dirty else 'Clean'
 
     def decide(self, percept):
         location, is_dirty = percept
-        
-        # 1. Update Internal State first
         self.update_state(location, is_dirty)
-        
-        # 2. If internal model says EVERYWHERE is clean, Stop
+
         if all(status == 'Clean' for status in self.model.values()):
             return "NoOp (Job Done)"
-        
-        # Standard Cleaning Rules
+
         if is_dirty:
             return "Suction on"
         elif location == 'A':
@@ -128,13 +143,38 @@ class ModelBasedReflexAgent:
             return "Left"
 ```
 
-#### Simulation Output
+**Line-by-line breakdown:**
 
+- `self.model = {'A': 'Unknown', 'B': 'Unknown'}` — The agent starts knowing **nothing** about either room.
+- `update_state()` is called **first** every time `decide()` runs. It records the observed room as `'Clean'` or `'Dirty'` in the model.
+- `all(status == 'Clean' for status in self.model.values())` — This is the **new rule** the simple agent couldn't have: "If I know for a fact that every room is clean, stop."
+- Only after the "all clean" check does it fall through to the standard clean/move rules.
+
+#### Simulation Code & Step-by-Step Walkthrough
+
+```python
+env_state = {'A': False, 'B': True}  # A is Clean, B is Dirty
+agent_location = 'A'
+agent = ModelBasedReflexAgent()
+
+for i in range(5):
+    is_dirty = env_state[agent_location]
+    percept = (agent_location, is_dirty)
+    action = agent.decide(percept)
+    if action == "NoOp (Job Done)":
+        break
+    # Update environment based on action...
 ```
-Loc: A | Dirty: False | Model: {'A': 'Clean', 'B': 'Unknown'} -> Action: Right
-Loc: B | Dirty: True  | Model: {'A': 'Clean', 'B': 'Dirty'}  -> Action: Suction on
-Loc: B | Dirty: False | Model: {'A': 'Clean', 'B': 'Clean'}  -> Action: NoOp (Job Done)
-```
+
+**Setup:** `env_state = {'A': False, 'B': True}` — Room A is **clean**, Room B is **dirty**. Agent starts at `'A'`.
+
+| Step | Location | `is_dirty` | `self.model` (after update) | All Clean? | Action |
+|------|----------|-----------|---------------------------|------------|--------|
+| 0 | `'A'` | `False` | `{'A': 'Clean', 'B': 'Unknown'}` | No (`'Unknown'` ≠ `'Clean'`) | `"Right"` → move to B |
+| 1 | `'B'` | `True` | `{'A': 'Clean', 'B': 'Dirty'}` | No | `"Suction on"` → clean B |
+| 2 | `'B'` | `False` | `{'A': 'Clean', 'B': 'Clean'}` | **Yes** | `"NoOp (Job Done)"` → **STOP** |
+
+**What's happening:** The agent visits A, records it as clean, but doesn't know about B yet (`'Unknown'`), so it moves right. At B it sees dirty, cleans it. On the next check, B is now clean, and the model confirms **both rooms are clean** → the agent stops. No infinite loop! The `break` exits the for-loop entirely.
 
 ### Key Takeaway
 
@@ -159,7 +199,7 @@ Goal-based agents represent a significant evolution from reflex agents. Instead 
 
 ### The Grid World Scenario
 
-An agent 'A' must navigate a 5x5 grid to reach goal 'G' at position (4,4).
+An agent `'A'` must navigate a 5×5 grid to reach goal `'G'` at position `(4, 4)`, starting from `(0, 0)`.
 
 ### Environment Class
 
@@ -181,7 +221,18 @@ class Environment:
         elif action == "Left":
             self.agent_pos[1] -= 1
         self.path_taken.append(tuple(self.agent_pos))
+
+    def display(self):
+        # Clears console, prints grid with A (agent), G (goal), . (path)
+        ...
 ```
+
+**Line-by-line breakdown:**
+
+- `self.agent_pos = list(start)` — Converts the start tuple `(0,0)` to a mutable list `[0, 0]` so we can modify it in-place. Index `[0]` = row, `[1]` = column.
+- `update_agent_pos()` modifies the position: `"Down"` adds 1 to row (moves down the grid), `"Right"` adds 1 to column (moves right on the grid).
+- `self.path_taken` accumulates every position visited as a tuple, used by `display()` to show dots `.` where the agent has been.
+- `display()` clears the screen and redraws the 5×5 grid with `A` at the agent's position, `G` at the goal, and `.` for visited cells. `time.sleep(0.8)` creates an animation effect.
 
 ### Goal-Based Agent Implementation
 
@@ -191,20 +242,21 @@ class GoalBasedAgent:
         self.env = env
         self.plan = []
 
+    def perceive(self):
+        return self.env.agent_pos
+
+    def formulate_goal(self):
+        return self.env.goal_pos
+
     def formulate_plan(self, start, goal):
-        """
-        Simple Planner: Calculate arithmetic difference to generate action sequence
-        """
         plan = []
         
-        # Calculate vertical distance
         diff_row = goal[0] - start[0]
         if diff_row > 0:
             plan.extend(["Down"] * diff_row)
         elif diff_row < 0:
             plan.extend(["Up"] * abs(diff_row))
         
-        # Calculate horizontal distance
         diff_col = goal[1] - start[1]
         if diff_col > 0:
             plan.extend(["Right"] * diff_col)
@@ -214,32 +266,68 @@ class GoalBasedAgent:
         return plan
 
     def run(self):
-        # 1. PERCEIVE current location
-        current_loc = self.perceive()
-        goal_loc = self.formulate_goal()
+        current_loc = self.perceive()       # [0, 0]
+        goal_loc = self.formulate_goal()     # [4, 4]
         
-        # 2. PLAN - Generate FULL plan before taking any action
         self.plan = self.formulate_plan(current_loc, goal_loc)
         print(f"Plan created: {self.plan}")
         
-        # 3. ACT - Execute plan
         for action in self.plan:
             self.env.update_agent_pos(action)
+            self.env.display()
+        
+        print("Goal Reached!")
 ```
+
+**Line-by-line breakdown of `formulate_plan()`:**
+
+- `diff_row = goal[0] - start[0]` → `4 - 0 = 4`. We need to go **4 rows down**.
+- `plan.extend(["Down"] * 4)` → plan is now `["Down", "Down", "Down", "Down"]`.
+- `diff_col = goal[1] - start[1]` → `4 - 0 = 4`. We need to go **4 columns right**.
+- `plan.extend(["Right"] * 4)` → plan is now `["Down", "Down", "Down", "Down", "Right", "Right", "Right", "Right"]`.
+- No BFS/DFS graph search — just simple arithmetic. This works because the grid has no obstacles.
+
+**Line-by-line breakdown of `run()`:**
+
+- `perceive()` reads current position `[0, 0]` from the environment.
+- `formulate_goal()` reads goal position `[4, 4]` from the environment.
+- `formulate_plan()` generates the **complete plan** before any movement happens.
+- The `for` loop executes each action **blindly** — the agent doesn't re-check its sensors.
+
+#### Simulation & Step-by-Step Walkthrough
+
+```python
+world = Environment(5, (0, 0), (4, 4))
+agent = GoalBasedAgent(world)
+world.display()
+agent.run()
+```
+
+**Plan generated:** `['Down', 'Down', 'Down', 'Down', 'Right', 'Right', 'Right', 'Right']`
+
+| Step | Action | `agent_pos` After | Grid Position |
+|------|--------|-------------------|---------------|
+| 0 | `"Down"` | `[1, 0]` | Row 1, Col 0 |
+| 1 | `"Down"` | `[2, 0]` | Row 2, Col 0 |
+| 2 | `"Down"` | `[3, 0]` | Row 3, Col 0 |
+| 3 | `"Down"` | `[4, 0]` | Row 4, Col 0 (bottom-left) |
+| 4 | `"Right"` | `[4, 1]` | Row 4, Col 1 |
+| 5 | `"Right"` | `[4, 2]` | Row 4, Col 2 |
+| 6 | `"Right"` | `[4, 3]` | Row 4, Col 3 |
+| 7 | `"Right"` | `[4, 4]` | Row 4, Col 4 → **Goal Reached!** |
+
+The agent first goes all the way down, then all the way right. It takes exactly 8 steps — the minimum possible. The path on the grid looks like an "L" shape.
 
 ### Key Concepts Demonstrated
 
-1. **Planning Before Acting**: The agent generates a complete sequence of actions (`['Down', 'Down', 'Down', 'Down', 'Right', 'Right', 'Right', 'Right']`) before moving.
-
-2. **Explicit Goal Formulation**: The agent calls `formulate_goal()` to define exactly what success looks like.
-
-3. **Open-Loop Execution**: Once the plan is made, the agent executes it blindly. If an obstacle appeared mid-execution, the agent wouldn't adapt.
-
-4. **World Representation**: The agent understands the world through coordinates and uses simple arithmetic as a planning heuristic.
+1. **Planning Before Acting**: The agent generates a complete action sequence before moving. A reflex agent would move one step at a time without any plan.
+2. **Explicit Goal Formulation**: `formulate_goal()` defines what success looks like — reaching `(4,4)`.
+3. **Open-Loop Execution**: The `for action in self.plan` loop executes blindly. If an obstacle appeared at `(2,0)` mid-execution, the agent would crash into it because it's not re-checking sensors.
+4. **Simple Arithmetic as Planning**: `goal[0] - start[0]` is the entire "intelligence" — no complex search algorithm needed for an obstacle-free world.
 
 ### Limitation
 
-This is "open-loop control"—the agent assumes the world won't change while executing. More advanced agents use "closed-loop" control, re-checking sensors during execution.
+This is "open-loop control" — the agent assumes the world won't change while executing. More advanced agents use "closed-loop" control, re-checking sensors during execution.
 
 ---
 
@@ -271,7 +359,17 @@ class Route:
         self.cost = cost_dollars      # Lower is better
         self.safety = safety_rating   # Higher is better (1-10)
         self.view = view_rating       # Higher is better (1-10)
+
+    def __repr__(self):
+        return (f"{self.name}: {self.time}min, ${self.cost}, "
+                f"Safety: {self.safety}/10, View: {self.view}/10")
 ```
+
+**Line-by-line breakdown:**
+
+- The `Route` class is a simple data container — each route has 4 numeric attributes.
+- `__repr__` provides a human-readable string when you `print()` a Route object, e.g., `"Highway: 20min, $15, Safety: 8/10, View: 2/10"`.
+- Some attributes you want to **minimize** (time, cost) and some to **maximize** (safety, view). The utility function handles this distinction via positive/negative weights.
 
 ### The Utility Function
 
@@ -294,7 +392,6 @@ class UtilityBasedAgent:
         self.weights = weights  # The "personality"
 
     def utility_function(self, route):
-        """Calculate 'Happiness Score' for a route"""
         u = 0
         u += route.time * self.weights.get('time', 0)
         u += route.cost * self.weights.get('cost', 0)
@@ -303,7 +400,6 @@ class UtilityBasedAgent:
         return u
 
     def choose_route(self, routes):
-        """Evaluate all options, pick highest utility"""
         best_route = None
         highest_utility = float('-inf')
         
@@ -316,33 +412,66 @@ class UtilityBasedAgent:
         return best_route
 ```
 
-### Two Different "Personalities"
+**Line-by-line breakdown of `utility_function()`:**
 
-#### Business Agent
+- `self.weights.get('time', 0)` — Looks up the weight for `'time'`. If not found, defaults to `0` (that factor is ignored).
+- Each attribute is multiplied by its weight and accumulated into `u`.
+- A negative weight (e.g., `time: -2.0`) means higher time **reduces** the score (the agent is penalized for slow routes).
+- A positive weight (e.g., `safety: 2.0`) means higher safety **increases** the score.
+
+**Line-by-line breakdown of `choose_route()`:**
+
+- `highest_utility = float('-inf')` — Starts at negative infinity so any real score will beat it.
+- The loop evaluates every route, keeping track of the best one found so far.
+- After iterating all routes, `best_route` holds the winner.
+
+### Simulation & Step-by-Step Walkthrough
+
 ```python
+possible_routes = [
+    Route("Highway",      time_minutes=20, cost_dollars=15, safety_rating=8, view_rating=2),
+    Route("Back Roads",   time_minutes=45, cost_dollars=0,  safety_rating=6, view_rating=9),
+    Route("City Center",  time_minutes=30, cost_dollars=5,  safety_rating=4, view_rating=5)
+]
+
 exec_weights = {'time': -2.0, 'cost': -0.1, 'safety': 2.0, 'view': 0.0}
-```
-- Hates wasting time (`time: -2.0`)
-- Doesn't care about cost (`cost: -0.1`)
-- Values safety (`safety: 2.0`)
-- **Chooses: Highway** (fast and safe)
+agent_exec = UtilityBasedAgent("Business Agent", exec_weights)
 
-#### Student Agent
-```python
 student_weights = {'time': -0.1, 'cost': -5.0, 'safety': 1.0, 'view': 2.0}
+agent_student = UtilityBasedAgent("Student Agent", student_weights)
 ```
-- Hates spending money (`cost: -5.0`)
-- Doesn't mind extra time (`time: -0.1`)
-- Enjoys nice views (`view: 2.0`)
-- **Chooses: Back Roads** (free and scenic)
+
+#### Business Agent Score Calculation
+
+Weights: `time: -2.0, cost: -0.1, safety: 2.0, view: 0.0`
+
+| Route | Time × -2.0 | Cost × -0.1 | Safety × 2.0 | View × 0.0 | **Total** |
+|-------|-------------|-------------|--------------|------------|-----------|
+| Highway | 20 × -2.0 = **-40** | 15 × -0.1 = **-1.5** | 8 × 2.0 = **16** | 2 × 0.0 = **0** | **-25.5** |
+| Back Roads | 45 × -2.0 = **-90** | 0 × -0.1 = **0** | 6 × 2.0 = **12** | 9 × 0.0 = **0** | **-78.0** |
+| City Center | 30 × -2.0 = **-60** | 5 × -0.1 = **-0.5** | 4 × 2.0 = **8** | 5 × 0.0 = **0** | **-52.5** |
+
+**Winner: Highway (-25.5)** — The least negative score. The business agent hates wasting time, and Highway is the fastest (only 20 min gets the smallest time penalty).
+
+#### Student Agent Score Calculation
+
+Weights: `time: -0.1, cost: -5.0, safety: 1.0, view: 2.0`
+
+| Route | Time × -0.1 | Cost × -5.0 | Safety × 1.0 | View × 2.0 | **Total** |
+|-------|-------------|-------------|--------------|------------|-----------|
+| Highway | 20 × -0.1 = **-2** | 15 × -5.0 = **-75** | 8 × 1.0 = **8** | 2 × 2.0 = **4** | **-65.0** |
+| Back Roads | 45 × -0.1 = **-4.5** | 0 × -5.0 = **0** | 6 × 1.0 = **6** | 9 × 2.0 = **18** | **19.5** |
+| City Center | 30 × -0.1 = **-3** | 5 × -5.0 = **-25** | 4 × 1.0 = **4** | 5 × 2.0 = **10** | **-14.0** |
+
+**Winner: Back Roads (19.5)** — The only positive score! Back Roads costs $0 (no cost penalty at all) and has the best view (9 × 2.0 = 18 points). The student doesn't mind the 45 minutes (only -4.5 penalty).
 
 ### Key Insights
 
-1. **Rational ≠ Identical**: Two agents can be perfectly rational yet make opposite choices because they value outcomes differently.
+1. **Rational ≠ Identical**: Both agents are perfectly rational — they each pick the best option for their own priorities. The student isn't "wrong" for taking the slow road.
 
-2. **Explicit Preferences**: The utility function makes an agent's priorities transparent and tunable.
+2. **Explicit Preferences**: Changing the weights dictionary completely changes the agent's behavior. You can "tune" an agent's personality by adjusting numbers.
 
-3. **Scalable Decision-Making**: By reducing complex, multi-attribute choices to a single score, utility functions enable efficient comparison among hundreds of options.
+3. **Scalable Decision-Making**: By reducing complex, multi-attribute choices to a single score, utility functions enable efficient comparison even among hundreds of options.
 
 ---
 
@@ -387,7 +516,16 @@ def query_openai(prompt):
     return response.choices[0].message.content
 ```
 
-**Key Feature**: The `chat.completions.create` format has become the industry standard.
+**Line-by-line breakdown:**
+
+- `OpenAI(api_key=...)` — Creates a client object authenticated with your API key. All subsequent calls go through this client.
+- `client.chat.completions.create(...)` — This is the core API call. The `chat.completions` endpoint is the **industry standard** format.
+- `model="gpt-4.1-mini"` — Specifies which model to use. Change this string to use `"gpt-4o"`, `"gpt-4"`, etc.
+- `messages=[...]` — A list of message objects. Each has a `"role"` and `"content"`:
+  - `"system"` — Sets the AI's behavior/personality. The model reads this first.
+  - `"user"` — The actual question/prompt from the user.
+- `temperature=0.7` — Controls randomness. `0.0` = deterministic (same answer every time), `1.0` = more creative/varied.
+- `response.choices[0].message.content` — The API returns a `choices` array (usually 1 item). `.message.content` extracts the text string of the reply.
 
 #### 2. Anthropic (Claude 3.5 Sonnet, Opus)
 
@@ -404,11 +542,16 @@ def query_anthropic(prompt):
             {"role": "user", "content": prompt}
         ]
     )
-    # Note: Different response structure
     return message.content[0].text
 ```
 
-**Key Feature**: Known for large context windows and safety focus.
+**Line-by-line breakdown:**
+
+- `anthropic.Anthropic(...)` — Creates the Anthropic client. Different class from OpenAI's.
+- `client.messages.create(...)` — Anthropic's API call. Note: `messages.create` instead of `chat.completions.create`.
+- `max_tokens=1024` — **Required** by Anthropic (OpenAI makes this optional). Caps the response length.
+- `messages=[...]` — Same role/content format as OpenAI, but Anthropic handles system instructions separately (via a `system` parameter in some versions).
+- `message.content[0].text` — Key difference from OpenAI! Anthropic returns `content` as a **list of content blocks** (not a string). You access `[0].text` to get the text. OpenAI uses `choices[0].message.content` (a string directly).
 
 #### 3. Google Gemini
 
@@ -423,7 +566,22 @@ def query_gemini(prompt):
     return response.text
 ```
 
-**Key Feature**: Creates a `GenerativeModel` object rather than using chat completion style. Native multimodal capabilities.
+**Line-by-line breakdown:**
+
+- `genai.configure(api_key=...)` — Sets the API key globally (module-level config, not per-client).
+- `genai.GenerativeModel('gemini-2.5-flash')` — Creates a model **object**. This is fundamentally different from OpenAI/Anthropic where you pass the model name as a string to each API call.
+- `model.generate_content(prompt)` — Sends the prompt directly as a string. No `messages=[...]` array needed for simple queries. This is the simplest API surface of the three.
+- `response.text` — Extracts the generated text. Much simpler than navigating `choices[0].message.content`.
+
+#### Side-by-Side API Comparison
+
+| Step | OpenAI | Anthropic | Gemini |
+|------|--------|-----------|--------|
+| Create client | `OpenAI(api_key=...)` | `anthropic.Anthropic(api_key=...)` | `genai.configure(api_key=...)` |
+| Call API | `client.chat.completions.create(...)` | `client.messages.create(...)` | `model.generate_content(prompt)` |
+| Pass model | `model="gpt-4.1-mini"` (string param) | `model="claude-haiku-4-5"` (string param) | `GenerativeModel('gemini-2.5-flash')` (object) |
+| Pass prompt | `messages=[{"role":..., "content":...}]` | `messages=[{"role":..., "content":...}]` | `prompt` (plain string) |
+| Get response | `response.choices[0].message.content` | `message.content[0].text` | `response.text` |
 
 ---
 
@@ -431,12 +589,27 @@ def query_gemini(prompt):
 
 **What is OpenRouter?**
 
-A unified interface that allows you to access almost any major LLM using a **single API format** (the OpenAI format).
+A unified interface that allows you to access almost any major LLM using a **single API format** (the OpenAI format). You use the `openai` Python library but point it at OpenRouter's URL instead:
+
+```python
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=userdata.get('OPENROUTER_APIKEY')
+)
+```
+
+The key trick is `base_url` — instead of calling `api.openai.com`, requests go to `openrouter.ai`, which forwards them to the right provider. You then switch models by changing a string:
+
+```python
+model="anthropic/claude-3-opus"    # Uses Claude via OpenRouter
+model="meta-llama/llama-3-70b"     # Uses Llama via OpenRouter
+model="openai/gpt-4o"              # Uses GPT-4o via OpenRouter
+```
 
 **Benefits:**
 - **One SDK**: Only need the `openai` library to access Claude, Llama, Mistral, etc.
-- **Model Shopping**: Switch models by changing a string (e.g., `gpt-4` to `anthropic/claude-3-opus`)
-- **Cost Effective**: Usually charges standard provider prices
+- **Model Shopping**: Switch models by changing a string — no code rewrite needed.
+- **Cost Effective**: Usually charges standard provider prices.
 
 ### Comparison Table
 
@@ -455,7 +628,7 @@ A unified interface that allows you to access almost any major LLM using a **sin
 
 ### Overview
 
-This is a complete, practical AI agent that demonstrates **Function Calling**—the mechanism that bridges the gap between an AI model (text generator) and actual code (which can perform actions).
+This is a complete, practical AI agent that demonstrates **Function Calling** — the mechanism that bridges the gap between an AI model (text generator) and actual code (which can perform actions).
 
 ### The Business Problem
 
@@ -499,7 +672,6 @@ Think of the LLM as a smart receptionist. It understands what people want, but i
 
 ```python
 def lookup_domain_info(domain: str) -> str:
-    """Simulates calling an external API like Clearbit or Crunchbase"""
     mock_data = {
         "acmecorp.com": {"industry": "Software/SaaS", "size": "501-1000 employees", "revenue": "$50M - $100M"},
         "widgetco.net": {"industry": "Manufacturing", "size": "100-250 employees", "revenue": "$10M - $25M"},
@@ -509,11 +681,16 @@ def lookup_domain_info(domain: str) -> str:
     return json.dumps(info)
 ```
 
+**Line-by-line breakdown:**
+
+- `mock_data` — A dictionary simulating an external API like Clearbit or Crunchbase. In production, this would be a real HTTP request.
+- `mock_data.get(domain, {...})` — Looks up the domain. If the domain isn't in the mock data, returns a default dict with `"Unknown"` values. This handles unknown companies gracefully.
+- `json.dumps(info)` — Converts the Python dict to a JSON string. The LLM can only receive text, not Python objects, so we serialize it.
+
 #### Tool 2: CRM History Check
 
 ```python
 def check_crm_history(email: str) -> str:
-    """Simulates querying a CRM system like Salesforce"""
     mock_data = {
         "jane@acmecorp.com": {"last_contact": "2025-11-15", "status": "Cold Lead", "notes": "Attended webinar, no follow-up yet."},
         "bob@widgetco.net": {"last_contact": "2025-12-01", "status": "Active Opportunity", "notes": "Discussed Q1 budget and product integration."},
@@ -522,13 +699,18 @@ def check_crm_history(email: str) -> str:
     return json.dumps(history)
 ```
 
+**Line-by-line breakdown:**
+
+- Same pattern as Tool 1 — mock data simulating a CRM database (Salesforce, HubSpot).
+- The default fallback `"No Record"` handles completely new leads that aren't in the CRM yet.
+- Returns JSON string with `last_contact` date, engagement `status`, and free-text `notes`.
+
 #### Tool 3: Lead Score Calculator
 
 ```python
 def calculate_lead_score(data_summary: str) -> str:
-    """Analyzes collected data to assign High/Medium/Low priority"""
     data = json.loads(data_summary)
-    score = "Low"
+    score = "Low"  # Default score
     
     if data["domain_info"].get("revenue", "").startswith("$1B+"):
         score = "High"
@@ -539,6 +721,28 @@ def calculate_lead_score(data_summary: str) -> str:
     
     return json.dumps({"lead_score": score})
 ```
+
+**Line-by-line breakdown:**
+
+- `json.loads(data_summary)` — Parses the incoming JSON string back to a Python dict. This dict contains both `domain_info` and `crm_history` from previous tool calls.
+- The scoring logic is a simple priority cascade:
+  - Revenue `"$1B+"` → **High** (massive company = high-value lead)
+  - Status `"Active Opportunity"` → **High** (there's already a deal in progress)
+  - Revenue starts with `"$50M"` → **Medium** (significant revenue but no active deal)
+  - Everything else → **Low** (default)
+- Returns a JSON string like `{"lead_score": "Medium"}`.
+
+#### Function-to-Python Mapping
+
+```python
+AVAILABLE_FUNCTIONS = {
+    "lookup_domain_info": lookup_domain_info,
+    "check_crm_history": check_crm_history,
+    "calculate_lead_score": calculate_lead_score,
+}
+```
+
+This dictionary maps function **name strings** (what the LLM outputs) to actual **Python function objects** (what your code runs). When the LLM says "call `lookup_domain_info`", the code does `AVAILABLE_FUNCTIONS["lookup_domain_info"]` to get the real function and then calls it.
 
 ---
 
@@ -566,6 +770,12 @@ tools_schema = [
 ]
 ```
 
+**What each field does:**
+
+- `"name"` — Must exactly match the key in `AVAILABLE_FUNCTIONS`. This is how the code knows which function to call.
+- `"description"` — The LLM reads this to decide **when** to use the tool. A poor description = the LLM won't know when to call it.
+- `"parameters"` — Tells the LLM what arguments to provide and their types. `"required"` ensures the LLM always includes mandatory fields.
+
 ---
 
 ### The Agent Loop
@@ -581,7 +791,7 @@ def run_agent(user_prompt: str):
     collected_data = {}  # Agent's "memory" across steps
 
     while True:
-        # THINK: Send to model
+        # THINK: Send conversation to model
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -598,7 +808,6 @@ def run_agent(user_prompt: str):
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments)
                 
-                # Execute the function
                 function_result = AVAILABLE_FUNCTIONS[function_name](**function_args)
                 
                 # Store in memory
@@ -620,17 +829,42 @@ def run_agent(user_prompt: str):
             break
 ```
 
-### Test Scenarios
+**Line-by-line breakdown:**
 
-**Scenario 1: Jane @ AcmeCorp** (High-value enterprise)
-- Domain: acmecorp.com → Software/SaaS, $50M-$100M revenue
-- CRM: Cold Lead, attended webinar
-- Score: **Medium**
+- `messages = [...]` — Initializes the conversation with a system prompt (agent instructions) and the user's request.
+- `collected_data = {}` — A dict that persists **across loop iterations** to accumulate data from multiple tool calls.
+- **The `while True` loop** — This is the agent loop. It keeps running until the model decides it has enough info.
+- `client.chat.completions.create(...)` — Sends the full conversation history + tool definitions to GPT-4o. `tool_choice="auto"` lets the model decide whether to call a tool or respond directly.
+- `messages.append(response_message)` — Adds the model's response (including any tool call requests) to the conversation history; the model needs to "see" its own previous messages.
+- `if response_message.tool_calls:` — The model either returns **tool calls** (it wants to act) or **text content** (it's ready to answer). This branch handles tools.
+- `tool_call.function.name` — The string name of the function the model wants to call, e.g., `"lookup_domain_info"`.
+- `json.loads(tool_call.function.arguments)` — The model provides arguments as a JSON string, e.g., `'{"domain": "acmecorp.com"}'`. We parse it to a dict.
+- `AVAILABLE_FUNCTIONS[function_name](**function_args)` — Looks up the real Python function and calls it with the parsed arguments. `**function_args` unpacks the dict as keyword arguments.
+- `collected_data["domain_info"] = ...` — Stores each tool's result so later tools (like `calculate_lead_score`) can access accumulated data.
+- `"role": "tool"` message — Sends the tool's output **back to the model** so it can process the result and decide what to do next.
+- `else: break` — When the model returns text instead of tool calls, it has finished reasoning. We print the final summary and exit the loop.
 
-**Scenario 2: Bob @ WidgetCo** (Active deal)
-- Domain: widgetco.net → Manufacturing, $10M-$25M revenue
-- CRM: Active Opportunity
-- Score: **High** (due to active opportunity status)
+#### Step-by-Step Walkthrough: Scenario 1 (jane@acmecorp.com)
+
+**Input:** `"Please qualify this lead for my call tomorrow: jane@acmecorp.com"`
+
+| Loop Iteration | Model Decision | What Happens |
+|---------------|----------------|--------------|
+| 1 | Calls `lookup_domain_info(domain="acmecorp.com")` | Extracts domain from email. Tool returns `{"industry": "Software/SaaS", "size": "501-1000 employees", "revenue": "$50M - $100M"}`. Stored in `collected_data["domain_info"]`. Result appended to messages. |
+| 2 | Calls `check_crm_history(email="jane@acmecorp.com")` | Tool returns `{"last_contact": "2025-11-15", "status": "Cold Lead", "notes": "Attended webinar, no follow-up yet."}`. Stored in `collected_data["crm_history"]`. Result appended to messages. |
+| 3 | Calls `calculate_lead_score(data_summary="{...}")` | Model combines collected data into a JSON string and passes it. Scoring logic: revenue starts with `"$50M"` → score = **"Medium"**. Result appended to messages. |
+| 4 | Returns text (no tool calls) | Model synthesizes all data into a readable summary for the sales rep. Loop `break`s. |
+
+**Final output:** A formatted summary with company info, CRM history, lead score, and talking points for the sales call.
+
+#### Step-by-Step Walkthrough: Scenario 2 (bob@widgetco.net)
+
+| Loop Iteration | Model Decision | Key Detail |
+|---------------|----------------|------------|
+| 1 | `lookup_domain_info("widgetco.net")` | Revenue: `"$10M - $25M"` (smaller company) |
+| 2 | `check_crm_history("bob@widgetco.net")` | Status: `"Active Opportunity"` (deal in progress!) |
+| 3 | `calculate_lead_score(...)` | Status is "Active Opportunity" → score = **"High"** (despite lower revenue) |
+| 4 | Returns final summary | Despite being a smaller company, the active deal status pushes it to High priority. |
 
 ---
 
@@ -644,14 +878,8 @@ This is a **hands-on exercise** (stub file with TODOs) where students build a mu
 
 ### What It Does
 
-1. Downloads 4 CSV files from Google Drive:
-   - `saas_docs.csv` - SaaS documentation
-   - `credit_card_terms.csv` - Credit card terms
-   - `hospital_policy.csv` - Hospital policies
-   - `ecommerce_faqs.csv` - E-commerce FAQs
-
+1. Downloads 4 CSV files from Google Drive
 2. Creates a LangChain agent that can query across all datasets
-
 3. Provides an interactive chat loop for natural language Q&A
 
 ---
@@ -673,18 +901,34 @@ for filename, url in files_to_download.items():
         gdown.download(url, filename, quiet=False, fuzzy=True)
 ```
 
+**Line-by-line breakdown:**
+
+- `files_to_download` — A dict mapping local filenames to Google Drive URLs. Each CSV covers a different domain.
+- `os.path.exists(filename)` — Checks if the file was already downloaded. Avoids re-downloading on repeated runs.
+- `gdown.download(url, filename, quiet=False, fuzzy=True)` — `gdown` is a library for downloading from Google Drive. `fuzzy=True` lets it handle various Google Drive URL formats (share links, direct links, etc.).
+
 ---
 
 ### Part 2: AI Agent Setup
 
-#### Load All CSVs
+#### Loading CSVs
 
 ```python
 dataframes = []
+loaded_names = []
+
 for filename in files_to_download.keys():
     df = pd.read_csv(filename)
     dataframes.append(df)
+    loaded_names.append(filename)
 ```
+
+**Line-by-line breakdown:**
+
+- `dataframes = []` — Will hold 4 Pandas DataFrames, one per CSV.
+- `pd.read_csv(filename)` — Reads each CSV into a DataFrame (a table with rows and columns).
+- `dataframes.append(df)` — The order matters: `dataframes[0]` = saas_docs, `dataframes[1]` = credit_card_terms, etc.
+- The LangChain agent receives this **list** of DataFrames and can query any of them.
 
 #### System Prompt
 
@@ -698,9 +942,11 @@ You are a smart data assistant capable of reading multiple CSV files.
 """
 ```
 
+This prompt is prepended to every user question. The key instruction is **"Do NOT answer from general knowledge"** — forcing the agent to always look at the actual CSV data rather than making things up.
+
 ---
 
-### TODOs for Students
+### TODOs for Students (Solutions)
 
 #### TODO 1: Initialize the LLM
 
@@ -713,17 +959,26 @@ llm = ChatOpenAI(
 )
 ```
 
+- `ChatOpenAI` is LangChain's wrapper around the OpenAI API. It works like `OpenAI()` but integrates with LangChain's agent framework.
+- `temperature=0.0` — Fully deterministic. Important for data queries — you want consistent, precise answers, not creative ones.
+
 #### TODO 2: Create the Pandas Agent
 
 ```python
 agent = create_pandas_dataframe_agent(
     llm,
-    dataframes,  # <-- Pass the list of DataFrames here
+    dataframes,  # <-- The list of 4 DataFrames
     verbose=True,
     agent_type="openai-functions",
     allow_dangerous_code=True
 )
 ```
+
+- `create_pandas_dataframe_agent` — A LangChain function that creates an agent capable of writing and executing Python/Pandas code to answer questions about DataFrames.
+- `dataframes` — The list of 4 DataFrames. The agent gets access to all of them and can figure out which one to query.
+- `verbose=True` — Prints the agent's internal reasoning (which DataFrame it picks, what Pandas code it writes). Very useful for debugging.
+- `agent_type="openai-functions"` — Uses OpenAI's function calling mechanism (same concept as Notebook 5) under the hood.
+- `allow_dangerous_code=True` — Required because the agent generates and executes Python code dynamically. The "dangerous" warning exists because arbitrary code execution can be risky in production.
 
 #### TODO 3: Invoke the Agent
 
@@ -732,6 +987,14 @@ agent = create_pandas_dataframe_agent(
 result = agent.invoke(final_query)
 response = result['output']
 ```
+
+- `agent.invoke(final_query)` — Sends the combined system prompt + user question to the agent. The agent then:
+  1. Reads the question
+  2. Decides which DataFrame(s) to query
+  3. Writes Pandas code (e.g., `df[df['category'] == 'visiting hours']['answer'].values[0]`)
+  4. Executes the code
+  5. Returns the result
+- `result['output']` — The agent returns a dict; the `'output'` key contains the final text answer.
 
 ---
 
@@ -749,6 +1012,23 @@ while True:
     result = agent.invoke(final_query)
     print(f"AI: {result['output']}")
 ```
+
+**Line-by-line breakdown:**
+
+- `while True:` — Infinite loop that keeps the conversation going until the user types "exit".
+- `input("You: ")` — Reads user input from the terminal.
+- `user_input.lower() in ["exit", "quit", "q"]` — Case-insensitive exit check.
+- `final_query = system_prompt + "\n\nQuestion: " + user_input` — Prepends the system prompt to every question. This ensures the agent always remembers its rules (use data, not general knowledge).
+- `agent.invoke(final_query)` — Under the hood, the agent may make multiple LLM calls: one to understand the question, one to write Pandas code, one to interpret the result.
+
+#### Example Interaction Walkthrough
+
+**User:** `"What is the visiting hour in the hospital?"`
+
+1. Agent sees the question, determines `hospital_policy.csv` (DataFrame index 2) is relevant
+2. Agent generates Pandas code like: `df2[df2['question'].str.contains('visiting', case=False)]['answer'].iloc[0]`
+3. Code executes, returns the answer from the CSV
+4. Agent formats and returns: `"Visiting hours are from 9:00 AM to 8:00 PM daily."`
 
 ### Example Questions
 

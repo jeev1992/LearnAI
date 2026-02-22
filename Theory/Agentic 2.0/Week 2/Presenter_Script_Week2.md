@@ -148,7 +148,78 @@ Notice that none of those user queries used the exact words in the ticket titles
 
 ## SLIDE 22 — Let's Get It Started
 
-Alright, enough theory. Let's get into it. We're starting with Module 1: Text Embeddings.
+Alright, before we dive into any code, I want to spend a few minutes giving you the big picture — because if you understand *why* we're building each piece and where it fits, everything else will click into place much faster.
+
+**The fundamental problem we're solving.**
+
+You have a large language model — something like GPT-4. It's incredibly capable. It can reason, summarize, explain, write code. But it has one critical limitation: it only knows what it was trained on. It has a knowledge cutoff. It has never read your internal documentation. It has never seen your support tickets. It has no idea what happened in your company last week. If you ask it about those things, it will either say "I don't know" — or worse, it will make something up. That's called hallucination. And in enterprise settings, hallucination is not acceptable.
+
+So the question becomes: how do you give a pre-trained LLM access to your private, specific, up-to-date knowledge — without retraining it from scratch?
+
+**Why not just fine-tune the model?**
+
+This is the question everyone asks. And it's a fair question. Fine-tuning means taking a pre-trained model and continuing to train it on your own data so it "learns" your domain. Here's why that's often not the right answer:
+
+First, cost. Fine-tuning requires GPU compute, large datasets, training pipelines, evaluation infrastructure. You're looking at thousands of dollars per run, minimum. And every time your data changes, you run it again.
+
+Second, freshness. A fine-tuned model has a snapshot of your data baked into its weights from the moment of training. If your documentation changes tomorrow, the model doesn't know. You'd have to retrain. RAG retrieves from a live database — update your documents, the system updates instantly.
+
+Third, transparency. When a fine-tuned model answers a question, you have no idea where that answer came from. Was it from document A or document B? You can't tell. RAG can cite exact source chunks — you know exactly what grounded every answer.
+
+Fourth, hallucination is not solved by fine-tuning. A fine-tuned LLM still generates from memory. It still invents things confidently. RAG grounds every answer in retrieved evidence — the LLM reads actual relevant context before responding.
+
+Fifth, catastrophic forgetting. Fine-tuning on a narrow domain can cause the model to degrade on everything else it knew. RAG preserves the base model completely.
+
+**RAG: the architecture that solves all of this.**
+
+RAG — Retrieval Augmented Generation — works in two phases. First, an offline phase: you take all your documents, process them, and build a searchable knowledge store. Second, an online phase: when a query comes in, you retrieve the most relevant pieces from that store and feed them to the LLM as context. The LLM doesn't need to memorize your data — it reads the relevant parts, on demand, for every single query.
+
+Here is the complete RAG pipeline:
+
+```
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    OFFLINE — KNOWLEDGE INGESTION                        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+  Raw Documents                                          Vector Store
+  (PDFs, tickets,  →  [CHUNKING]  →  [EMBEDDING]  →  [ INDEX / DB ]
+   wikis, code)         ▲                 ▲                 ▲
+                        │                 │                 │
+                   Module 2 ◄─────── Module 1 ────────► Module 3
+                  (this week)         (this week)        (this week)
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                     ONLINE — RETRIEVAL + GENERATION                     ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+  User Query                                                   Answer
+      │                                                           ▲
+      ▼                                                           │
+  [EMBEDDING]  →  [VECTOR SEARCH]  →  [RETRIEVED CHUNKS]  →  [ LLM ]
+                        ▲                      ▲                  ▲
+                        │                      │                  │
+                   Module 3 ◄──────────── Week 3 ──────────►  Week 3
+                  (this week)            (next week)          (next week)
+```
+
+Let me walk you through this left to right.
+
+On the offline side — which is what today is all about — you start with raw documents. Those could be support tickets, internal wikis, PDFs, code files, anything. The first step is **chunking**: you break those documents into smaller, meaningful pieces. Too large and the chunk is noisy — it has too much irrelevant context. Too small and you lose coherence. Getting chunking right is an art, and Module 2 is entirely about that.
+
+Once you have chunks, you run each one through an **embedding model**. The model converts each chunk from text into a vector — a list of numbers that represents its meaning in high-dimensional space. That's Module 1, and we start there. Understanding embeddings is the foundation of everything.
+
+Those vectors are then stored in a **vector index** — a searchable database organized so you can find the nearest vectors quickly. How you structure that index — flat, hierarchical, keyword-based, hybrid — dramatically changes what you can retrieve and how fast. That's Module 3.
+
+On the online side — which comes in Weeks 3, 4, and 5 — a user query arrives, gets embedded into the same vector space, and a similarity search finds the most relevant chunks. Those chunks get assembled into a prompt for the LLM. The LLM reads that context and generates a grounded, cited answer. That's the full pipeline: not the LLM hallucinating from memory, but the LLM reading actual relevant evidence and reasoning over it.
+
+**What we're building today — the knowledge infrastructure.**
+
+Modules 1, 2, and 3 are the left side of that diagram. The offline pipeline. The knowledge foundation. Without this side done well, no amount of clever prompting or agent design on the generation side will save you. Garbage in, garbage out. If your chunks are bad, your retrieval is bad. If your retrieval is bad, your LLM answers are bad — even with a perfect model.
+
+So today we're building the foundation. Next week, we wire it all together into a working RAG pipeline and start building agents on top of it.
+
+Alright. Let's start with Module 1: Text Embeddings.
 
 ---
 

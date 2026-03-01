@@ -489,7 +489,132 @@ This labeled dataset is the foundation of everything that follows. The quality o
 
 ## SLIDE 33 — Precision@K, Recall@K, F1@K
 
-Let me make these formulas concrete with an example.
+### Precision and Recall in Retrieval
+
+When we talk about retrieval systems — search engines, RAG pipelines, vector databases — two of the most important evaluation metrics are **Precision** and **Recall**. Let's break them down intuitively and mathematically.
+
+#### Intuition First
+
+Imagine you ask: *"Give me documents about vector databases in RAG systems."*
+
+There are **10 truly relevant documents** in the entire database. Your retriever returns **6 documents**. Out of those 6, only **4 are actually relevant.**
+
+**Precision** — Out of what you retrieved, how many were correct?
+
+$$Precision = \frac{Relevant\ Retrieved}{Total\ Retrieved} = \frac{4}{6} = 0.67$$
+
+67% of what you retrieved was useful.
+
+**Recall** — Out of all relevant documents that exist, how many did you successfully retrieve?
+
+$$Recall = \frac{Relevant\ Retrieved}{Total\ Relevant\ in\ System} = \frac{4}{10} = 0.4$$
+
+You found only 40% of all relevant content.
+
+#### Clean Definitions
+
+- **Precision:** "When the system retrieves something, how often is it correct?" High precision = fewer irrelevant results.
+- **Recall:** "Out of everything relevant that exists, how much did we find?" High recall = fewer missed relevant items.
+
+#### The Tradeoff (Very Important in RAG Systems)
+
+There is usually a tradeoff:
+
+| If You Optimize For | What Happens |
+|---|---|
+| High Precision | You return fewer but highly accurate docs |
+| High Recall | You return many docs, but some may be irrelevant |
+
+In RAG systems:
+- **High precision** → Better LLM answers (less noise)
+- **High recall** → Less chance of missing important context
+
+#### Confusion Matrix View
+
+Let's define:
+- **True Positive (TP)** → Relevant and retrieved
+- **False Positive (FP)** → Retrieved but irrelevant
+- **False Negative (FN)** → Relevant but not retrieved
+
+Then:
+
+$$Precision = \frac{TP}{TP + FP}$$
+
+$$Recall = \frac{TP}{TP + FN}$$
+
+#### Why This Matters for RAG
+
+If **recall is low:**
+- You miss critical chunks
+- LLM hallucinates due to missing context
+
+If **precision is low:**
+- Too much irrelevant context
+- Context window polluted
+- LLM gives diluted answers
+
+This is why **chunking strategy**, **embedding quality**, **top-k tuning**, **re-ranking**, and **hybrid search** all directly impact precision and recall.
+
+#### F1 Score (Combined Metric)
+
+To balance both:
+
+$$F1 = 2 \times \frac{Precision \times Recall}{Precision + Recall}$$
+
+It penalizes systems that are strong in one but weak in the other.
+
+#### Mental Model
+
+Think of it like fishing:
+- **Precision** → Of the fish you caught, how many are edible?
+- **Recall** → Of all edible fish in the lake, how many did you catch?
+
+#### Does High Recall Mean High Precision? No.
+
+They measure two different things, and you can easily have one high and the other low.
+
+- **Recall** cares about NOT missing relevant items
+- **Precision** cares about NOT including irrelevant items
+
+You can increase recall simply by retrieving more and more results — but that often hurts precision.
+
+**Case 1 — High Recall, Low Precision:**
+Your retriever returns 100 documents. Relevant among them = 10 (you found all). Irrelevant = 90.
+
+$$Recall = \frac{10}{10} = 100\%\ (Perfect)$$
+
+$$Precision = \frac{10}{100} = 10\%\ (Very\ poor)$$
+
+You didn't miss anything (great recall), but most results are junk (bad precision).
+
+**Case 2 — High Precision, Low Recall:**
+Your retriever returns 3 documents, all correct.
+
+$$Precision = \frac{3}{3} = 100\%$$
+
+$$Recall = \frac{3}{10} = 30\%$$
+
+Everything returned is good, but you missed most relevant info.
+
+#### Why They Usually Trade Off
+
+To increase recall you widen search, increase top-k, and lower similarity threshold — but that also pulls in more irrelevant results, reducing precision.
+
+In RAG systems this shows up constantly:
+- **Top-k = 20:** Recall ↑ (more chance to include correct chunks), Precision ↓ (more noisy chunks)
+- **Top-k = 3:** Precision ↑, Recall ↓ (risk missing key context)
+
+This is why advanced RAG uses **retrieval + reranking**, **hybrid search**, and **semantic filtering** to get both high precision AND high recall.
+
+**Important rule:** Increasing recall is easy — just retrieve more. Increasing precision is harder — you must retrieve *smarter*.
+
+**One-line mental model:** Imagine throwing a net into the ocean. Huge net → you catch all fish (high recall) but also trash (low precision). Small targeted spear → only good fish (high precision) but you miss many (low recall).
+
+---
+
+### Applying These Concepts: Precision@K, Recall@K, F1@K
+
+Now let me make these formulas concrete with a support desk example.
 
 Say our ground truth says 4 tickets are relevant for the query "How do I fix auth failures?" Our retriever returns 5 tickets, 3 of which are in the ground truth set.
 

@@ -80,7 +80,7 @@ Here's a quick visual reminder of the agentic loop. You have a prompt coming in 
 
 ## SLIDE 13 — Today's Agenda
 
-Here's what we're covering today. Three modules. Module 1 is Text Embeddings — the foundation of semantic search. Module 2 is Chunking Strategies — how to break documents into the right-sized pieces for retrieval. Module 3 is Indexing Strategies for RAG — how to organize your chunks so retrieval is fast and accurate. We'll start with Module 1. Each module has a theory section followed by a live coding demo, so you'll see everything in action. Let's go.
+Here's what we're covering today. Three modules. Module 1 is Text Embeddings — the foundation of semantic search. Module 2 is Chunking Strategies — how to break documents into the right-sized pieces for retrieval. We'll be using the LangChain framework for Module 2 because LangChain has a rich set of built-in text splitters — fixed-size, recursive, semantic, markdown-aware, HTML-aware — all with a consistent Document abstraction that makes it very easy to chunk, embed, and store in one clean pipeline. Module 3 is Indexing Strategies for RAG — how to organize your chunks so retrieval is fast and accurate. For Module 3 we'll switch to the LlamaIndex framework, because LlamaIndex was purpose-built for document indexing and retrieval — it has first-class support for all five indexing strategies we'll cover: Vector, Summary, Tree, Keyword, and Hybrid. Doing that in LangChain would require significantly more custom code. In production, these two frameworks are complementary — LlamaIndex handles your indexing, LangChain handles your chains and agents, and they integrate seamlessly. We'll start with Module 1. Each module has a theory section followed by a live coding demo, so you'll see everything in action. Let's go.
 
 ---
 
@@ -554,6 +554,8 @@ So why does indexing strategy matter at all? Because not all queries need the sa
 The diagram on screen shows the full RAG architecture. On the left, documents flow through chunking, embedding, and into vector storage. On the right, a user query gets vectorized, matched, and the relevant context gets passed to the LLM for generation. The key sentence: *Indexing happens offline. Retrieval happens online at query time.* You build the index once — or update it on a schedule. Every query benefits from it instantly.
 
 One more thing before we go into the demo. In this module we're switching from LangChain to LlamaIndex. A quick word on why. LangChain is excellent at orchestration — chains, agents, memory, integrations. LlamaIndex was purpose-built for document indexing and retrieval. It has clean, first-class abstractions for all five indexing strategies we're about to explore — Vector, Summary, Tree, Keyword, and Hybrid. LangChain would require significantly more custom code to demonstrate the same patterns. In production, these two frameworks integrate seamlessly — LlamaIndex handles your indexing, LangChain handles your chains and agents. Think of them as complementary tools, not competing ones. Different frameworks, same concepts. Everything you learn here applies universally.
+
+> 📄 **Reference:** For a detailed write-up of all five indexing strategies — including code samples, pros/cons, real-world use cases, and the Tree Index physics textbook walkthrough — see **[IndexingStrategiesForRAG.md](IndexingStrategiesForRAG.md)**.
 
 ---
 

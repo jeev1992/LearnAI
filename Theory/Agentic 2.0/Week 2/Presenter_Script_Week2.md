@@ -174,6 +174,161 @@ Fifth, catastrophic forgetting. Fine-tuning on a narrow domain can cause the mod
 
 RAG — Retrieval Augmented Generation — works in two phases. First, an offline phase: you take all your documents, process them, and build a searchable knowledge store. Second, an online phase: when a query comes in, you retrieve the most relevant pieces from that store and feed them to the LLM as context. The LLM doesn't need to memorize your data — it reads the relevant parts, on demand, for every single query.
 
+**🔴 LIVE DEMO — Understanding R.A.G. with a Real Example**
+
+Okay — I want to make this concrete. I'm not going to just show you a diagram. I'm going to show you RAG happening, live, right now. We'll walk through each letter — R, A, G — one at a time. By the end of this, you'll understand exactly what each piece does and why it matters.
+
+---
+
+**Step 1: GENERATION (without retrieval) — The "G" in RAG**
+
+Let's start at the end: Generation. That's what LLMs are built to do — generate text. Let me open ChatGPT right now and ask it a question.
+
+> **Prompt I send to ChatGPT:**
+> "What is the resolution for support ticket TICK-042 where users reported that the payment reconciliation batch job fails silently every night at 2 AM when processing transactions from the APAC region?"
+
+*[Send this to ChatGPT live and show the response on screen.]*
+
+Now look at what ChatGPT just did. Read the response carefully — all of you.
+
+*[Pause. Let students read the response for 15–20 seconds.]*
+
+Two things can happen here, and both prove the point:
+
+**Scenario A — ChatGPT refuses.** It says something like "I don't have access to your internal ticketing system" or "I can't look up specific support tickets." That's an honest admission of ignorance. The model knows it doesn't know. That's the *good* outcome — but it's useless. You asked a question and got no answer.
+
+**Scenario B — ChatGPT halluccinates.** This is the dangerous one, and it's what usually happens. Look at the screen. It probably gave you a detailed, confident, beautifully formatted response — maybe it mentions timezone mismatches, null pointer exceptions, silent catch blocks, retry mechanisms. It might even have emoji headers and numbered steps. It *looks* like a thorough root cause analysis from a senior engineer.
+
+**But every single word of it is made up.**
+
+TICK-042 does not exist in ChatGPT's training data. There is no payment reconciliation batch job that it knows about. There is no APAC gateway. It has never seen our internal tickets. But instead of saying "I don't know" — it *invented* an entire diagnosis. And it did it confidently. No hedging. No disclaimers. Just pure, authoritative-sounding fabrication.
+
+**This is hallucination.** And this is *exactly* why hallucination is dangerous in enterprise settings. If an engineer reads that response and acts on it — starts implementing whatever "fix" ChatGPT invented — they're chasing a ghost. The real root cause could be entirely different. They've wasted hours, maybe days, on a fix for a problem that was never diagnosed.
+
+The LLM can *generate* — it's spectacularly good at generating. But generation without grounding is just creative writing. It has no knowledge of our private data. It fills the gap with plausible-sounding patterns from its training. And the more detailed and confident the hallucination looks, the more dangerous it is.
+
+**Keep this response on screen. We're going to come back to it in a few minutes and see what happens when we give the same model actual context.**
+
+---
+
+**Step 2: RETRIEVAL — The "R" in RAG**
+
+Now, here's the key insight. What if, *before* we ask the LLM, we first go find the relevant information from our own knowledge base?
+
+Imagine we have a system that stores all of our support tickets. When the user asks their question — "What is the resolution for the APAC payment reconciliation failure?" — we search our knowledge base and retrieve the most relevant chunks. The search could be a semantic match (meaning-based) or even a keyword match — we'll cover both approaches in detail today. But the point is: we go find the answer in our data first.
+
+Here's what we get back — let's say three chunks:
+
+> **Retrieved Chunk 1** (from TICK-042, Payment Gateway category):
+> "Ticket TICK-042: The payment reconciliation batch job fails silently at 2:00 AM UTC when processing transactions from the APAC region. No error is logged. The job completes with exit code 0 but zero transactions are reconciled. Affected since March 15 deployment."
+
+> **Retrieved Chunk 2** (from TICK-042, Resolution Notes):
+> "Root cause: The APAC gateway endpoint was migrated to a new regional URL during the March 15 infrastructure update, but the batch job configuration still pointed to the deprecated endpoint. The deprecated endpoint returns an empty response instead of an error, causing a silent failure."
+
+> **Retrieved Chunk 3** (from TICK-042, Resolution Steps):
+> "Resolution: Update the APAC gateway endpoint URL in the batch job configuration file at `/etc/payments/apac-gateway.conf`. Change `gateway.apac.endpoint` from `https://pay-old.apac.internal/v1/reconcile` to `https://pay.apac.internal/v2/reconcile`. Restart the reconciliation service. Verified fix on March 18 — all APAC transactions reconciling correctly."
+
+That's retrieval. We went into our private knowledge store and pulled out exactly the pieces of information that are relevant to this question. The LLM didn't know any of this — but our retrieval system found it.
+
+---
+
+**Step 3: AUGMENTED — The "A" in RAG**
+
+Now comes the clever part. We don't just hand those chunks to the user. We don't just hand the question to the LLM either. We **augment** the prompt. We combine the retrieved context with the user's question into a single, structured prompt that tells the LLM: "Here is some context. Use it to answer the question."
+
+Here's the prompt template — and this is exactly how real RAG systems work:
+
+```
+PROMPT TEMPLATE:
+────────────────────────────────────────────────────
+You are a helpful support desk assistant. Answer the
+user's question based ONLY on the provided context.
+If the context does not contain enough information
+to answer, say "I don't have enough information."
+
+CONTEXT:
+{context}
+
+QUESTION:
+{question}
+
+ANSWER:
+────────────────────────────────────────────────────
+```
+
+See those two variables? `{context}` and `{question}`. That's the augmentation. We take the retrieved chunks and insert them into `{context}`. We take the user's original question and insert it into `{question}`. The LLM never has to recall anything from memory — we're giving it a reading comprehension exercise.
+
+Here's what the final augmented prompt looks like after we plug everything in:
+
+```
+FINAL AUGMENTED PROMPT (sent to the LLM):
+────────────────────────────────────────────────────
+You are a helpful support desk assistant. Answer the
+user's question based ONLY on the provided context.
+If the context does not contain enough information
+to answer, say "I don't have enough information."
+
+CONTEXT:
+Ticket TICK-042: The payment reconciliation batch job
+fails silently at 2:00 AM UTC when processing
+transactions from the APAC region. No error is logged.
+The job completes with exit code 0 but zero transactions
+are reconciled. Affected since March 15 deployment.
+
+Root cause: The APAC gateway endpoint was migrated to a
+new regional URL during the March 15 infrastructure
+update, but the batch job configuration still pointed to
+the deprecated endpoint. The deprecated endpoint returns
+an empty response instead of an error, causing a silent
+failure.
+
+Resolution: Update the APAC gateway endpoint URL in the
+batch job configuration file at
+`/etc/payments/apac-gateway.conf`. Change
+`gateway.apac.endpoint` from
+`https://pay-old.apac.internal/v1/reconcile` to
+`https://pay.apac.internal/v2/reconcile`. Restart the
+reconciliation service. Verified fix on March 18 — all
+APAC transactions reconciling correctly.
+
+QUESTION:
+What is the resolution for support ticket TICK-042 where
+users reported that the payment reconciliation batch job
+fails silently every night at 2 AM when processing
+transactions from the APAC region?
+
+ANSWER:
+────────────────────────────────────────────────────
+```
+
+---
+
+**Step 4: GENERATION (with retrieval) — The "G" in RAG, again**
+
+Now we send this augmented prompt to the same LLM. The exact same model that couldn't answer the question before.
+
+*[Send the augmented prompt to ChatGPT live and show the response on screen.]*
+
+> **ChatGPT's response (with RAG context):**
+> "The payment reconciliation batch job for the APAC region (TICK-042) was failing silently because the APAC gateway endpoint was migrated to a new URL during the March 15 deployment, but the batch job configuration was not updated. The deprecated endpoint returns an empty response instead of an error, so the job exits with code 0 but reconciles zero transactions.
+>
+> **Resolution:** Update the APAC gateway endpoint in `/etc/payments/apac-gateway.conf` — change `gateway.apac.endpoint` from `https://pay-old.apac.internal/v1/reconcile` to `https://pay.apac.internal/v2/reconcile`, then restart the reconciliation service. This fix was verified on March 18."
+
+Look at that. Same model. Same LLM. But now it gives a perfect, accurate, detailed answer — because we gave it the right context. The model didn't learn anything new. We didn't retrain it. We didn't fine-tune it. We just retrieved the relevant information and augmented the prompt. That's it. That's RAG.
+
+**Let's recap what just happened:**
+
+| Step | Component | What happened |
+|------|-----------|--------------|
+| 1 | **Generation** (alone) | LLM hallucinated — invented a detailed but entirely fabricated root cause and 5-point fix. |
+| 2 | **Retrieval** | We searched our private knowledge base and found 3 relevant chunks. |
+| 3 | **Augmented** | We plugged those chunks + the question into a prompt template. |
+| 4 | **Generation** (with RAG) | Same LLM now gives a perfect, grounded, cited answer. |
+
+That's the entire idea behind Retrieval Augmented Generation. Today, we're going to build the machinery that powers Step 2 — the retrieval side. How do we take raw documents, break them into chunks, embed them as vectors, store them in a searchable index, and find the right ones when a question comes in? That's Modules 1, 2, and 3.
+
+---
+
 Here is the complete RAG pipeline:
 
 ```

@@ -133,7 +133,7 @@ The key is for **course-related work only** — do not use it for personal side 
 
 ## Slide 10 — Clone & Practice: Your Learning Repository
 
-> *Repo: github.com/jeev1992/real-estate-negotiation-simulator/tree/refactor/Module 3-adk-web-restructure. Includes 3 complete modules (Naive Baseline, MCP Servers, A2A & Google ADK) and ready-to-run demos with practice exercises and solutions.*
+> *Repo: github.com/jeev1992/real-estate-negotiation-simulator/. Includes 3 complete modules (Naive Baseline, MCP Servers, A2A & Google ADK) and ready-to-run demos with practice exercises and solutions.*
 
 "Here is the repository we will be working out of for the entire class. The URL is on screen — `github.com/jeev1992/real-estate-negotiation-simulator`. Please clone it now, even if you don't plan to run the code live. Just having the files open in your editor while I walk through them will make today ten times more useful.
 

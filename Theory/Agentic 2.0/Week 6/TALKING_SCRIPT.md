@@ -147,19 +147,78 @@ To get started: **`git clone`** the repo, **`pip install -r requirements.txt`**,
 
 ## Slide 11 — How to Follow Along
 
-> *Setup commands: clone, venv, pip install, copy .env. Module 1: naive_negotiation.py / state_machine.py. Module 2: demos and github_agent_client.py. Module 3: adk web with various agent folders, including --a2a flag. Prerequisites: Python 3.11+, OPENAI_API_KEY, Node.js (for GitHub MCP).*
+> *Module Run Reference — one row per runnable file across all three modules. Use this as your cheat-sheet for the rest of the day. Keep a screenshot.*
 
-"This is your cheat-sheet slide — keep a screenshot of it. Top to bottom.
+"This is your **cheat-sheet slide** — please screenshot it. There is **one row per runnable file** in the workshop, grouped by module. Left column is the *exact command* to type. Right column is *one line* of what it means. If you ever lose your place during today's session, glance at this slide and you'll find your way back.
 
-**Setup.** Four commands. Clone the repo. Create a virtual environment with `python -m venv .venv` and activate it — on Windows that's `.venv\Scripts\activate`, on Mac or Linux it's `source .venv/bin/activate`. Install dependencies. Copy the `.env.example` to `.env` and paste your OpenAI key in.
+Let me walk through it module by module.
 
-**Module 1.** Two scripts. `naive_negotiation.py` requires the OpenAI key — it makes real GPT-4o calls to demonstrate the broken version. `state_machine.py` does *not* need the key — it's pure Python — so you can use that as a smoke test to verify your environment is set up correctly.
+**Module 1 — two rows.** `python m1_baseline/naive_negotiation.py` is the *intentionally broken* negotiation — `while True` plus raw strings plus regex — and it shows the ten failure modes of naive agents. `python m1_baseline/state_machine.py` is the **first fix** — a Finite State Machine where terminal states have empty transition sets, so the loop is **mathematically guaranteed to end**.
 
-**Module 2.** The MCP demos. `01_initialize_handshake.py` shows the raw JSON-RPC frames. `github_agent_client.py` is the LLM agent that talks to GitHub's official MCP server — that one needs Node.js installed because GitHub's MCP server runs as `npx @modelcontextprotocol/server-github`.
+**Module 2 — nine rows.** Two clients: `github_agent_client.py` runs the ReAct tool-loop against GitHub's *official* MCP server over `stdio`; `sse_agent_client.py` runs the same loop against our servers over **HTTP/SSE** — proving the transport is irrelevant. Two custom servers: `pricing_server.py` exposes `get_market_price` and `calculate_discount`; `inventory_server.py` exposes `get_inventory_level` plus the seller-only `get_minimum_acceptable_price` — that's where **information asymmetry** lives. And five deep-dive demos in `m2_mcp/demos/` — the **handshake on the wire**, the **full tool loop with timestamps**, **all four primitives** (tools, resources, prompts, sampling), the **three content types**, and **Streamable HTTP** as the spec's recommended replacement for raw SSE.
 
-**Module 3.** The ADK part. We use the **`adk web`** command — Google ADK ships a developer UI that runs on `localhost:8000`. You point it at a folder of agents and it gives you a chat interface, an event inspector, a state inspector — the whole nine yards. The flag **`--a2a`** is the key one — that's what enables the Agent-to-Agent protocol endpoints, exposing each agent as a discoverable service over HTTP.
+**Module 3 — three sub-tables.** First, `adk web m3_adk_multiagents/adk_demos/` opens a browser dropdown with **nine demos**, d01 through d09 — bare LlmAgent, MCPToolset, sessions, SequentialAgent, ParallelAgent, LoopAgent, AgentTool, callbacks, event stream. **One concept per demo.** Second, the **A2A protocol scripts** — `a2a_10` through `a2a_14` — *terminal scripts* you run against `adk web --a2a`, walking through the wire format, contextId threading, parts and artifacts, streaming, and the full **buyer ↔ seller orchestrated negotiation**. Third, `adk web m3_adk_multiagents/negotiation_agents/` exposes the **buyer**, **seller**, and **negotiation** agents themselves — the production-shaped composition that ties Module 1's FSM, Module 2's MCP, and all of Module 3 together in three Python files.
 
-**Prerequisites in pink.** Python 3.11 or higher — match statements and TypeAlias features matter. OpenAI key. Node.js only if you want to play with the GitHub MCP demo. Each module folder also has its own README with per-demo instructions, so you're never lost."
+**Prerequisites — three.** Python 3.11+. Your OpenAI API key. And Node.js, *only* if you want to run the GitHub MCP demo (it spawns the server via `npx`). Every module folder also has its own README with per-demo notes — so you're never more than one directory away from the answer."
+
+---
+
+### Module 1 — Baseline (why naive agents break)
+
+| # | Run | What it means (one line) |
+|---|---|---|
+| 1 | `python m1_baseline/naive_negotiation.py` | Intentionally broken negotiation — `while True` + raw strings + regex — shows the 10 failure modes of naive agents. |
+| 2 | `python m1_baseline/state_machine.py` | Finite State Machine (`IDLE → NEGOTIATING → AGREED/FAILED`) — terminal states have no exits, so the loop is **mathematically guaranteed to end**. |
+
+### Module 2 — MCP (give agents real tools)
+
+| # | Run | What it means (one line) |
+|---|---|---|
+| 1 | `python m2_mcp/github_agent_client.py` | LLM agent talks to **GitHub's official MCP server** over `stdio` — proves the ReAct tool-loop on a familiar API. |
+| 2 | `python m2_mcp/pricing_server.py` *(or `--sse --port 8001`)* | Custom MCP server exposing `get_market_price` + `calculate_discount` — the buyer/seller's source of market data. |
+| 3 | `python m2_mcp/inventory_server.py` *(or `--sse --port 8002`)* | Custom MCP server with `get_inventory_level` (public) + `get_minimum_acceptable_price` (seller-only) — demonstrates **information asymmetry**. |
+| 4 | `python m2_mcp/sse_agent_client.py` *(after starting servers in SSE mode)* | Same agent loop as the GitHub client, but over **HTTP/SSE** — proves the transport is irrelevant. |
+| 5 | `python m2_mcp/demos/01_initialize_handshake.py` | Raw JSON-RPC frames of the MCP `initialize` handshake — see the protocol on the wire, no SDK. |
+| 6 | `python m2_mcp/demos/02_tool_loop_trace.py` | Full **model ↔ host ↔ server** tool-calling loop, narrated step-by-step with timestamps. |
+| 7 | `python m2_mcp/demos/03_list_all_primitives.py` | Lists **Tools, Resources, and Prompts** from both servers — proves MCP carries more than just tools. |
+| 8 | `python m2_mcp/demos/04_content_types.py` | Inline server returning each Content block kind (text / image / embedded resource) so you see the JSON shapes. |
+| 9 | `python m2_mcp/demos/05_streamable_http_transport.py --serve` *(then `--client`)* | Same MCP protocol over **Streamable HTTP** — the spec's recommended replacement for raw SSE. |
+
+### Module 3 — Google ADK + A2A (multi-agent orchestration)
+
+**ADK demos — interactive Web UI** (`adk web m3_adk_multiagents/adk_demos/`)
+
+| # | Pick from dropdown | What it means (one line) |
+|---|---|---|
+| d01 | `d01_basic_agent` | Bare `LlmAgent` + a Python function tool — the simplest possible ADK agent. |
+| d02 | `d02_mcp_tools` | `LlmAgent` + `MCPToolset` — ADK auto-spawns the MCP server and discovers its tools. |
+| d03 | `d03_sessions_state` | `ToolContext` reads/writes session state that **persists across turns**. |
+| d04 | `d04_sequential` | `SequentialAgent` pipeline — each step's `output_key` feeds the next via `{placeholder}`. |
+| d05 | `d05_parallel` | `ParallelAgent` fan-out — concurrent agents writing to different state keys. |
+| d06 | `d06_loop` | `LoopAgent` that iterates until a callback sets `actions.escalate = True`. |
+| d07 | `d07_agent_as_tool` | `AgentTool` — wrap a whole agent as a callable tool for hierarchical delegation. |
+| d08 | `d08_callbacks` | `before_model` / `before_tool` / `after_tool` hooks — PII redaction, allowlists, logging. |
+| d09 | `d09_event_stream` | Inspect ADK's raw event stream — tool calls, state deltas, final-response markers. |
+
+**A2A protocol scripts — terminal** (start `adk web --a2a m3_adk_multiagents/negotiation_agents/` first)
+
+| # | Run | What it means (one line) |
+|---|---|---|
+| 10 | `python m3_adk_multiagents/adk_demos/a2a_10_wire_lifecycle.py --seller-url …/a2a/seller_agent` | Hand-crafted JSON-RPC `message/send` — see Agent Card discovery and task-state transitions. |
+| 11 | `python m3_adk_multiagents/adk_demos/a2a_11_context_threading.py --seller-url …/a2a/seller_agent` | Reuse `contextId` across rounds — multiple A2A calls become **one threaded conversation**. |
+| 12 | `python m3_adk_multiagents/adk_demos/a2a_12_parts_and_artifacts.py --seller-url …/a2a/seller_agent` | Multi-part Messages (`TextPart` + `DataPart`) and inspecting Artifacts returned by the agent. |
+| 13 | `python m3_adk_multiagents/adk_demos/a2a_13_streaming.py --seller-url …/a2a/seller_agent` | `message/stream` over SSE — task lifecycle events arrive in real time. |
+| 14 | `python m3_adk_multiagents/a2a_14_orchestrated_negotiation.py` | Full **buyer ↔ seller multi-round negotiation** over A2A — Agent Card discovery + threaded `message/send`. |
+
+**Negotiation agents — interactive Web UI** (`adk web m3_adk_multiagents/negotiation_agents/`)
+
+| Pick from dropdown | What it means (one line) |
+|---|---|
+| `buyer_agent` | `LlmAgent` + pricing `MCPToolset`; `before_tool_callback` enforces allowlist (cannot see seller's floor). |
+| `seller_agent` | `LlmAgent` + **two** `MCPToolset`s (pricing + inventory) — has private access to `get_minimum_acceptable_price`. |
+| `negotiation` | `LoopAgent` wrapping `SequentialAgent(buyer → seller)` — agreement detected via a structured `submit_decision` tool, not free text. |
+
+**Prerequisites:** Python 3.11+, `OPENAI_API_KEY`, Node.js (only for the GitHub MCP demo). Setup is four commands — `git clone`, `python -m venv .venv`, `pip install -r requirements.txt`, copy `.env.example` to `.env`. Each module folder has its own README with per-demo notes.
 
 ---
 

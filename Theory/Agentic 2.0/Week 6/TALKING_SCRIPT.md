@@ -184,6 +184,18 @@ Let me walk through it module by module.
 | 8 | `python m2_mcp/demos/04_content_types.py` | Inline server returning each Content block kind (text / image / embedded resource) so you see the JSON shapes. |
 | 9 | `python m2_mcp/demos/05_streamable_http_transport.py --serve` *(then `--client`)* | Same MCP protocol over **Streamable HTTP** — the spec's recommended replacement for raw SSE. |
 
+> **MCP Transports — quick explainer:**
+>
+> MCP supports three transports (same protocol, different wire). Pick based on deployment shape:
+>
+> | Transport | How it works | When to use |
+> |---|---|---|
+> | **stdio** | Host spawns the server as a **subprocess**; bytes flow over stdin/stdout pipes. Server dies when the client disconnects. 1:1 only. | Local dev, desktop apps (Claude Desktop), integration tests. Demos 01–04 use this. |
+> | **SSE** (Server-Sent Events) | Server runs as a long-lived **HTTP server** with two endpoints (`/sse` for streaming, `/messages` for requests). Clients connect over the network. | When server and client are on **different machines**, or you need the server to outlive the client. Legacy — still works, but being superseded. |
+> | **Streamable HTTP** | Single HTTP endpoint; server responds with a **chunked SSE body** inside a normal POST response. Multi-tenant, streaming + request-response on the same connection. | **New servers in production.** The MCP spec recommends this over raw SSE. Demo 05 shows it. |
+>
+> *Key insight: your agent code (`list_tools()`, `call_tool()`) is identical across all three — only the connection setup line changes. Think of it like choosing between USB, Bluetooth, or Wi-Fi to connect the same peripheral.*
+
 ### Module 3 — Google ADK + A2A (multi-agent orchestration)
 
 **ADK demos — interactive Web UI** (`adk web m3_adk_multiagents/adk_demos/`)
@@ -308,7 +320,7 @@ The key insight on the right is the through-line for the rest of the class: **`n
 
 "Look at the code at the top. **Six lines.** That's all it takes to write a 'real estate negotiation agent system'. A `while True`. Call the LLM. Regex out a price. If 'DEAL' is in the message, break. Done. Ship it.
 
-This is the implementation that *every single one of us* would write on day one. It's not stupid. It's not lazy. It is the *obvious* implementation. And **every line of it is a different bug**. The comments on the right tell you which. *Problem #3 — no state machine. Problem #1 — raw strings. Problem #5 — fragile regex. Problem #6 — unreliable termination.* Four bugs in six lines.
+This is the implementation that *every single one of us* would write on day one. It's not stupid. It's not lazy. It is the *obvious* implementation. And **every line of it is a different bug**.
 
 Now look at the table below. Ten problems. I'm not going to read all ten — you can pause on this slide afterward — but I want you to internalize the **structure of the table**, because it's the structure of the entire course.
 
@@ -584,17 +596,31 @@ The key insight: **the loop is structurally identical regardless of which model 
 
 "MCP is more than just tools. There are **four primitives** total. Tools are 90% of what you'll use, but you should know the other three exist.
 
-**Tool — direction: model invokes with arguments.** Decorated with `@mcp.tool()`. Use it when the agent needs to perform a *side-effecting action* with parameters. *'Get the market price of this address.' 'Send this email.' 'Create this calendar event.'* The LLM picks it; the LLM provides the arguments.
+Let me give you one analogy that covers all four, and then we'll go through each one. Imagine we're replacing a human real-estate agent with an AI agent. Think about everything a human agent has access to when they walk into a negotiation meeting — and ask yourself: *where does each of those things come from in MCP?*
 
-**Resource — direction: host fetches by URI.** Decorated with `@mcp.resource("scheme://path")`. Use it for *read-only documents* — could be static, like a PDF; could be computed, like a JSON catalog. The agent doesn't *call* it; the *host* fetches it and injects it as context. Think of it as 'context the agent always has' versus 'tools the agent might call'.
+**A tool is a phone call you make *during* the meeting.** *'Hold on — let me call my office right now and look up what houses on this street sold for last month.'* You decide *when* to call. You decide *what* to ask. The answer comes back and changes what you say next. That's `@mcp.tool()` — the LLM picks it, the LLM provides the arguments, the result feeds back into the conversation. In our codebase, `get_market_price` and `calculate_discount` are tools. The agent calls them mid-negotiation to ground its offers in real data.
 
-**Prompt — direction: host selects template.** Decorated with `@mcp.prompt("name")`. These are *parameterized reusable instructions* — like a Mad Lib. *'Negotiation tactics for a buyer in a hot market.' 'Code review checklist for Python.'* The user or host picks them, fills in parameters, and they get rendered into the conversation as messages. Prompts are *user-discovered*, not LLM-discovered.
+**A resource is the folder of documents your assistant printed and left on the table *before* the meeting.** Recent sale prices of nearby houses. The neighborhood rules. The home inspection checklist. You didn't ask for them mid-meeting — they were *pre-loaded* for you, sitting there as background context. That's `@mcp.resource("inventory://floor-prices")` — the host fetches the JSON catalog once, injects it into the agent's context, and it's just *there* for the entire conversation. The key difference from a tool: **the agent doesn't call a resource. The host provides it.** Think of it as *context the agent always has* versus *tools the agent might call*.
 
-**Sampling — direction: server asks host to call the LLM.** This is the inverted one. Imagine your MCP server needs LLM reasoning to do its job — say, summarizing a long document — but it doesn't want to hold its own OpenAI key. With sampling, the server says, *'Hey host, please run this prompt through your LLM and give me the result back.'* It's a host-side capability the server can request.
+**A prompt is a strategy card your boss hands you *before* you walk into the meeting — not data, but *instructions on how to behave*.** Your manager hands you a card: *'When the market is hot, start low and back it up with how long the house has been sitting unsold.'* That card doesn't contain any numbers or facts — it tells you *what to do*. You don't write the card — you *pick* one from the shelf, fill in the blanks (property address, market condition), and it becomes your game plan. That's `@mcp.prompt("negotiation-tactics")` — the host selects it with `role=buyer, market_condition=hot`, the server renders a fully parameterized instruction block, and it goes straight into the system prompt. **A tool gives you facts; a prompt tells you how to act on them.** Prompts are *user-discovered, not LLM-discovered* — the user or host picks them from a menu, not the model.
 
-The takeaway: **tools are 90% of MCP usage.** The other three are bonus capabilities you reach for when the situation fits.
+**Sampling is the reverse direction — the server asks the host to run something through the LLM.** Say the inspection-report server has a 50-page raw report. Instead of dumping all 50 pages into the agent's context, the server asks the host: *'Run this through your LLM with the prompt "list the top 3 risks" and send me back the result.'* The host runs it, returns a short summary, and the server includes *that* in its tool response instead of the full 50 pages. The server got LLM processing without holding its own API key — **only the host holds keys**, servers stay credential-free.
 
-The bottom table is **content types — what a tool can *return*.** `TextContent` — most common, plain text. `ImageContent` — base64-encoded image data, for charts or screenshots. `EmbeddedResource` — a *reference* to a resource the host can dereference. The protocol standardizes return blocks so the host can render them properly — text in a code block, images in an `<img>` tag, embedded resources as expandable links."
+**Honest caveat: sampling is the least-used MCP primitive.** It's in the spec, but most servers today just return raw data and let the agent's LLM handle the reasoning. You'll likely never implement sampling in this course — but knowing it exists matters because it explains a design question you'd otherwise ask: *'Why can't the server just call OpenAI directly?'* It *can* — but sampling lets you centralize all API keys in the host, which is cleaner for security and billing. That's the architectural argument, even if few servers use it yet.
+
+Here's how to remember all four. **Tool** — *I call you during the meeting for facts.* **Resource** — *you left documents on my desk before the meeting.* **Prompt** — *you told me how to behave before the meeting.* **Sampling** — *you called me and asked me to think for you.* Four primitives, four directions, one protocol.
+
+The takeaway: **tools are 90% of MCP usage.** Resources, prompts, and sampling are capabilities you reach for when the situation fits — but knowing they exist puts you ahead of most people using MCP today.
+
+Now — the bottom table on this slide is **content types — what a tool can *return*.** Three shapes.
+
+**`TextContent`** — the most common. Plain text or JSON. That's what `get_market_price` returns — a dict serialized as text. The host feeds it to the LLM as conversation history.
+
+**`ImageContent`** — base64-encoded image data plus a mime type like `image/png`. Useful when a tool generates a chart, a screenshot, or an OCR'd document. The host can render it in the UI; vision models can also reason over it.
+
+**`EmbeddedResource`** — a *reference* to a resource the host can dereference on demand. Instead of inlining a 50-page PDF, the tool returns a URI like `file:///report.pdf` — the host fetches it only if needed. This keeps context windows small.
+
+The protocol standardizes these return blocks so the host always knows what shape to expect — text in a code block, images in an `<img>` tag, embedded resources as expandable links. **No guessing, no parsing — typed content blocks all the way down.** And this pattern carries forward: A2A in Module 3 uses the same idea with `TextPart`, `FilePart`, and `DataPart`. Once you see typed content in MCP, you see it everywhere."
 
 ---
 
@@ -622,17 +648,116 @@ Look at the bottom-left code snippet. *Same FastMCP server*, three different way
 
 Read the trace top to bottom.
 
-**Frame 1 — client initialize.** The client sends `{jsonrpc: 2.0, method: 'initialize', params: {protocolVersion: 2024-11-05, capabilities: {}, clientInfo: {name: 'demo-client', version: '0.1'}}}`. *I'm a client, I support these capabilities, here's who I am.* `protocolVersion` is a date string — that's how MCP versioning works. `capabilities` is empty here because this client doesn't claim sampling or other features.
+**Frame 1 — client initialize (client → server).**
 
-**Frame 2 — server initialize result.** The server replies, *I am `real-estate-pricing` version 1.27.0, I support tools, prompts, and resources.* Both sides now know what's possible.
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "demo-client", "version": "0.1" }
+  }
+}
+```
 
-**Frame 3 — `notifications/initialized`.** Client sends a one-way notification — *'I'm ready, no response needed.'* This is the equivalent of a TCP three-way handshake completing.
+*I'm a client, here's my protocol version, here's who I am.* `protocolVersion` is a date string — that's how MCP versioning works. `capabilities` is empty here because this demo client doesn't claim sampling or other features.
 
-**Frame 4 — `tools/list`.** The client asks for the catalog.
+**Frame 2 — server initialize result (server → client).**
 
-**Frame 5 — `tools/list result`.** The server returns **two tools with full JSON schemas** — `get_market_price` and `calculate_discount`. Each schema includes name, description, and a complete `inputSchema` derived from the Python type hints.
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "prompts": { "listChanged": false },
+      "resources": { "subscribe": false, "listChanged": false },
+      "tools": { "listChanged": false }
+    },
+    "serverInfo": { "name": "real-estate-pricing", "version": "1.26.0" }
+  }
+}
+```
 
-Five frames total. After this, the client has everything it needs to actually call tools. **And the JSON Schema is generated from your Python type hints — you do not write schemas by hand.** That's the FastMCP magic — `def get_market_price(address: str, property_type: str) -> dict` becomes a JSON Schema automatically.
+*I am `real-estate-pricing` version 1.26.0, I support tools, prompts, and resources.* Both sides now know what's possible. Notice `listChanged: false` on each capability — that tells the client *'I won't notify you if my tool list changes mid-session; just use what you got at startup.'*
+
+**Frame 3 — `notifications/initialized` (client → server).**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "notifications/initialized"
+}
+```
+
+A one-way notification. Notice there's **no `id` field** — and that's the tell. In JSON-RPC, if a message has an `id`, the other side **must** send back a response with that same `id`. If there's no `id`, it's fire-and-forget — the server stays silent. Compare: Frame 1 had `"id": 1` → server replied with `"id": 1`. Frame 4 will have `"id": 2` → server will reply with `"id": 2`. This frame has no `id` → no reply. That's how JSON-RPC distinguishes *'I need an answer'* from *'just letting you know.'*
+
+**Frame 4 — `tools/list` (client → server).**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
+```
+
+The client asks for the catalog.
+
+**Frame 5 — `tools/list result` (server → client).** The server returns **two tools with full JSON schemas**. Here's the abbreviated shape (full output is much longer):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "tools": [
+      {
+        "name": "get_market_price",
+        "description": "Get comprehensive market pricing data for a property...",
+        "inputSchema": {
+          "properties": {
+            "address": { "type": "string" },
+            "property_type": { "default": "single_family", "type": "string" }
+          },
+          "required": ["address"],
+          "type": "object"
+        }
+      },
+      {
+        "name": "calculate_discount",
+        "description": "Calculate appropriate discount range based on market conditions...",
+        "inputSchema": {
+          "properties": {
+            "base_price": { "type": "number" },
+            "market_condition": { "default": "balanced", "enum": ["hot", "balanced", "cold"], "type": "string" },
+            "days_on_market": { "default": 0, "type": "integer" },
+            "property_condition": { "default": "good", "enum": ["excellent", "good", "fair", "poor"], "type": "string" }
+          },
+          "required": ["base_price"],
+          "type": "object"
+        }
+      }
+    ]
+  }
+}
+```
+
+Look at `get_market_price`'s schema: `address` is required (string), `property_type` is optional (default `"single_family"`). Look at `calculate_discount`: `base_price` is required (number), `market_condition` is an enum (hot/balanced/cold), `days_on_market` defaults to 0, `property_condition` is an enum (excellent/good/fair/poor). **Every parameter has a type, a default, and where applicable an enum of valid values.** The LLM reads these schemas and knows exactly what arguments to pass — no guessing, no hallucinating parameter names.
+
+Five frames total. After this, the client has everything it needs to actually call tools. **And the JSON Schema you just saw was generated automatically from the Python function signature — you did not write any of it by hand.** That's FastMCP's magic. Here's what happened:
+
+You wrote this Python:
+
+```python
+def get_market_price(address: str, property_type: str = "single_family") -> dict:
+```
+
+FastMCP saw `address: str` → produced `"address": { "type": "string" }` and added it to `"required"`. It saw `property_type: str = "single_family"` → produced `"property_type": { "type": "string", "default": "single_family" }` and left it out of `"required"` (because it has a default). Same for `calculate_discount` — `base_price: float` became `"type": "number"` in `"required"`, and the `Literal["hot", "balanced", "cold"]` type hint became the `"enum"` array. **Python type hints in, JSON Schema out. Zero manual schema writing.**
 
 One forward-looking note: **this is the same `jsonrpc: 2.0` wire format used by A2A** in Module 3. The method names change — `tools/call` becomes `message/send` — but the envelope is identical. Once you can read these MCP frames, you will instantly recognize A2A frames in two hours. *Same wire, different protocol on top.*"
 
@@ -640,25 +765,41 @@ One forward-looking note: **this is the same `jsonrpc: 2.0` wire format used by 
 
 ## Slide 36 — Demo 02: The Tool Loop (Model ↔ Host ↔ Server)
 
-> *Run: `python m2_mcp/demos/02_tool_loop_trace.py` (requires OPENAI_API_KEY). Trace with timestamps: t=0.00 host connecting to MCP server; t=3.18 tools/list → 2 tools discovered; t=3.67 model receiving prompt + tool catalog; t=6.77 model emitted tool_use(get_market_price); t=6.77 host translating tool_use → tools/call; t=6.77 server returned CallToolResult; t=6.77 host injecting tool_result into model context; t=10.42 model emitted final assistant text. Three actors: Model (GPT-4o) decides which tools to call; Host (your Python code) translates between OpenAI format and MCP format; Server executes the tool.*
+> *Run: `python m2_mcp/demos/02_tool_loop_trace.py` (requires OPENAI_API_KEY). Trace with timestamps showing the full model ↔ host ↔ server loop. Three actors: Model (GPT-4o-mini) decides which tools to call; Host (your Python code) translates between OpenAI format and MCP format; Server executes the tool.*
 
-"Now we add the LLM to the picture. This demo requires your OpenAI key because GPT-4o is the one *deciding* which tools to call. Let me walk through the timestamps because they tell the story.
+"Now we add the LLM to the picture. This demo requires your OpenAI key because the model is the one *deciding* which tools to call. Here's the actual output — let me walk through the timestamps because they tell the story.
+
+```
+[t= 0.00s] HOST    connecting to MCP server (stdio subprocess)
+[t= 1.41s] HOST    tools/list
+[t= 1.41s] SERVER  returned 2 tools
+[t= 1.80s] MODEL   receiving prompt + tool catalog
+[t= 5.83s] MODEL   emitted tool_use(get_market_price)
+[t= 5.83s] HOST    translating tool_use -> tools/call
+[t= 5.86s] SERVER  returned CallToolResult
+[t= 5.86s] HOST    injecting tool_result back into model context
+[t=14.25s] MODEL   emitted final assistant text
+```
 
 **t = 0 seconds.** Host starts, spins up the MCP server as a subprocess.
 
-**t = 3.18 seconds.** Host calls `tools/list`. Two tools come back. The 3-second delay is mostly Python startup — in production, this happens once at boot and amortizes across thousands of agent calls.
+**t = 1.41 seconds.** Host calls `tools/list`. Two tools come back — `get_market_price` and `calculate_discount`. The 1.4-second delay is mostly Python startup — in production, this happens once at boot and amortizes across thousands of agent calls.
 
-**t = 3.67 seconds.** Host sends the user's prompt to GPT-4o, along with the tool catalog as OpenAI function-calling specs. *'User wants to know if 742 Evergreen is overpriced. Here are two tools you can call.'*
+**t = 1.80 seconds.** Host sends the user's prompt to the model, along with the tool catalog converted to OpenAI function-calling specs. *'User wants to know the value of 742 Evergreen Terrace. Here are two tools you can call.'*
 
-**t = 6.77 seconds.** GPT-4o has thought for three seconds and decided: *'I should call `get_market_price`.'* It emits a `tool_use` block — OpenAI's format. **Important — the host then translates** that OpenAI `tool_use` into an MCP `tools/call` request. Same intent, different on-the-wire format. The host is the *translator*.
+**t = 5.83 seconds.** The model has thought for about 4 seconds and decided: *'I should call `get_market_price`.'* It emits a `tool_use` block — OpenAI's format. **Important — the host then translates** that OpenAI `tool_use` into an MCP `tools/call` request. Same intent, different on-the-wire format. The host is the *translator*.
 
-**t = 6.77 seconds (still).** Server executes the underlying Python function — pulls from the property database — and returns a `CallToolResult` with the structured market data.
+**t = 5.86 seconds.** Server executes the underlying Python function — pulls from the property database — and returns a `CallToolResult` with the structured market data. **Notice: 0.03 seconds.** The server is instant. All the time is in the *model*, not the *protocol*.
 
-**t = 6.77.** Host takes the result, formats it as a `tool_result` message, and injects it back into the OpenAI conversation history.
+**t = 5.86 seconds (still).** Host takes the result, formats it as a `tool_result` message, and injects it back into the OpenAI conversation history.
 
-**t = 10.42.** GPT-4o has seen the result, reasoned over it, and produced **final assistant text** — *'Yes, the property at $485K is about 5% above comparable sales of $462K, so it's slightly overpriced.'* End of loop.
+**t = 14.25 seconds.** The model has seen the result, reasoned over it, and produced **final assistant text**. It took about 8 seconds to compose its answer — because look at what it returned:
 
-The bottom table makes the three roles crystal clear. **Model decides** which tools to call. **Host translates** between LLM format and MCP format. **Server executes** the actual function. *Three actors, clean separation.* This loop is the heart of every MCP-based agent."
+*'The estimated market value is **$462,000**. The list price is $485,000 — about 4.7% above comparable sales. Fair offer range: $449K to $477K.'* Plus four comparable sales with addresses, prices, and days-on-market. **All of that came from the MCP tool result — not from the model's training data.** That's grounded reasoning.
+
+The bottom table makes the three roles crystal clear. **Model decides** which tools to call. **Host translates** between LLM format and MCP format. **Server executes** the actual function. *Three actors, clean separation.* This loop is the heart of every MCP-based agent.
+
+One timing insight worth calling out: **the model took 12 of the 14 seconds.** `t=1.80` to `t=5.83` — four seconds deciding to call the tool. `t=5.86` to `t=14.25` — eight seconds composing the final answer. The MCP server itself? *0.03 seconds.* **Most of the wall-clock time of an agent is the model thinking, not the protocol moving bytes.** That's true in production too — optimizing the protocol rarely matters; optimizing what you send to the model always does."
 
 ---
 
@@ -666,15 +807,41 @@ The bottom table makes the three roles crystal clear. **Model decides** which to
 
 > *Run: `python m2_mcp/demos/03_list_all_primitives.py` (no API key). Diagram showing pricing_server has tools [get_market_price, calculate_discount] + prompts [negotiation-tactics]; inventory_server has tools [get_inventory_level, get_minimum_acceptable_price] + resources [inventory://floor-prices]. Three points to make: MCP exposes more than tools; inventory://floor-prices is readable data, not callable function; negotiation-tactics is a prompt template the host can expand.*
 
-"This demo proves that MCP carries **more than just tools.** Look at the diagram.
+"This demo proves that MCP carries **more than just tools.** Here's the actual output when you run it:
 
-**Pricing server.** Two tools — `get_market_price` and `calculate_discount`. And one prompt — `negotiation-tactics`. The prompt is a *template* the host can render with parameters like `role=buyer, market_condition=hot`. It returns prose like *'You are negotiating as the buyer. Anchor low but defensible. Cite a comparable sale for every move.'* — guidance that gets injected into the system prompt at runtime.
+```
+=== PRICING SERVER (pricing_server.py) ===
+server caps: tools=True resources=True prompts=True
 
-**Inventory server.** Two tools — `get_inventory_level` and `get_minimum_acceptable_price`. And one resource — `inventory://floor-prices`. The resource is a JSON catalog of all known seller floor prices. The host can fetch it once and inject it into the agent's context, so the seller agent doesn't have to call a tool to know its own constraints.
+[tools] 2
+  - get_market_price
+  - calculate_discount
 
-The takeaway is the bottom note: *MCP exposes more than just tools — resources and prompts are first-class primitives too.* If the only word you remember from this slide is **'tools, resources, prompts — three primitives'**, you'll be ahead of 95% of people using MCP today.
+[resources] 0
 
-Two subtle observations to call out. **One — capabilities are not counts.** Look at the output: *both* servers report `tools=True`, `resources=True`, `prompts=True`. But pricing has *zero* resources, and inventory has *zero* prompts. That's fine. **Capability `True` means *the server supports the primitive*, not that it has items.** A server with zero resources still answers `list_resources()` — it just returns an empty list. *Capabilities advertise the API surface; counts are a runtime fact.*
+[prompts] 1
+  - negotiation-tactics: Tactical guidance string for a buyer or seller in a given market.
+
+=== INVENTORY SERVER (inventory_server.py) ===
+server caps: tools=True resources=True prompts=True
+
+[tools] 2
+  - get_inventory_level
+  - get_minimum_acceptable_price
+
+[resources] 1
+  - inventory://floor-prices :: floor_prices_resource
+
+[prompts] 0
+```
+
+Read it server by server.
+
+**Pricing server.** Two tools — `get_market_price` and `calculate_discount`. Zero resources. And one prompt — `negotiation-tactics` — described as *'Tactical guidance string for a buyer or seller in a given market.'* The prompt is a *template* the host can render with parameters like `role=buyer, market_condition=hot`. It returns instructions that get injected into the system prompt at runtime.
+
+**Inventory server.** Two tools — `get_inventory_level` and `get_minimum_acceptable_price`. Zero prompts. And one resource — `inventory://floor-prices` with the name `floor_prices_resource`. The resource is a JSON catalog of seller floor prices. The host can fetch it once and inject it into the agent's context, so the seller agent doesn't have to call a tool to know its own constraints.
+
+Now look at the **capabilities line** — this is the subtle part. *Both* servers report `tools=True`, `resources=True`, `prompts=True`. But pricing has *zero* resources, and inventory has *zero* prompts. **Capability `True` means *the server supports the primitive's API*, not that it has items.** A server with zero resources still answers `list_resources()` — it just returns an empty list. *Capabilities advertise the API surface; counts are a runtime fact.*
 
 **Two — the client doesn't care how many servers exist.** Look at the script: a single `inspect()` function connects to *each* server independently. The host can talk to one server, two servers, or twenty — same protocol, parallel sessions. This is how the seller agent works in Module 3: it merges tools from *two* MCP servers (pricing + inventory) into one unified tool catalog for the LLM. **Same code path, just more sessions.**"
 
@@ -684,17 +851,35 @@ Two subtle observations to call out. **One — capabilities are not counts.** Lo
 
 > *Run: `python m2_mcp/demos/04_content_types.py` (no API key). Diagram of host calling three tools: get_text returns type:text {text:'Hello'}; get_image returns type:image {data:'iVBORw...', mimeType:'image/png'}; get_resource returns type:resource {resource:{uri, text}}. Why it matters: most workshop tools return TextContent, but MCP can return any of these; protocol standardizes result blocks so host can render them properly; demo makes the JSON shape visible.*
 
-"Quick demo to show that tool *results* aren't just strings. Three different return types — three different JSON shapes.
+"Quick demo to show that tool *results* aren't just strings. Here's the actual output — three different return types, three different JSON shapes:
 
-**`type: text`** — most common. The result is a string, possibly long. The host renders it as text in the UI, feeds it to the LLM as conversation history. That's what `get_market_price` returns.
+```
+=== get_text ===
+  type=text
+  text='hello as plain text'
 
-**`type: image`** — base64-encoded image data plus a mime type like `image/png`. Useful when the tool generates a chart, a screenshot, an OCR'd document. The host can render it in the UI; some LLMs (vision models) can also reason over it.
+=== get_image ===
+  type=image
+  mimeType=image/png  data_len=92 (base64)
 
-**`type: resource`** — an *embedded reference*. Instead of inlining the full content, the tool returns a URI like `file:///report.pdf` and the host can dereference it on demand. This is how you avoid blowing up context windows with massive documents — return the reference, fetch on demand.
+=== get_resource ===
+  type=resource
+  uri=demo://greeting.txt  mimeType=text/plain  text='hello from an embedded resource'
+```
+
+Three tools, three content types.
+
+**`type=text`** — most common. The result is a string. That's what `get_market_price` returns — a dict serialized as text. The host feeds it to the LLM as conversation history.
+
+**`type=image`** — base64-encoded image data plus a mime type. Look at the output: `mimeType=image/png`, `data_len=92` — that's 92 characters of base64 (a tiny placeholder PNG). In a real server, this could be a chart, a screenshot, or a scanned document. The host can render it in the UI; vision models can also reason over it.
+
+**`type=resource`** — an *embedded reference*. Look at the output: `uri=demo://greeting.txt`, `mimeType=text/plain`, and the text is inlined right there. In production, instead of dumping a 50-page PDF into the context, the tool returns just the URI — the host can fetch it on demand. This keeps context windows small.
 
 The point is that the protocol is **typed all the way down**. You don't have to guess what a tool returned — there's a `type` field on the content block that tells you exactly what shape to expect. **No more parsing.**
 
 A practical note: **TextContent is the default and you almost never construct the others by hand.** When you write `@mcp.tool() def get_market_price(...) -> dict:` and return a Python dict, FastMCP **automatically wraps it in TextContent** — JSON-serialized. Every tool you've seen in this workshop returns plain TextContent. You only reach for ImageContent or EmbeddedResource when you specifically need them — say, a charting tool returning a PNG, or a documentation tool returning a long doc by URI. *The default does the right thing; the alternatives are escape hatches.*
+
+One implementation detail if someone asks about the code: **this demo doesn't use our pricing or inventory servers.** It embeds a tiny throwaway MCP server *as a Python string inside the script itself*, writes it to a temp file, spawns it as a subprocess, calls its three tools, and deletes the temp file when done. That's why it's fully self-contained — one command, no setup, no separate terminal. You'll see `SERVER_SOURCE = '''...'''` in the code — that's the inline server.
 
 And one tie-forward: **this is the same shape as A2A's Parts in Module 3.** TextContent maps to TextPart, ImageContent maps to FilePart, EmbeddedResource maps to DataPart-with-URI. **Different protocol, same idea — typed content blocks all the way down.** Once you see the pattern in MCP, you see it everywhere."
 

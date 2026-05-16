@@ -218,7 +218,7 @@ Let me walk through it module by module.
 |---|---|---|
 | 10 | `python m3_adk_multiagents/adk_demos/a2a_10_wire_lifecycle.py --seller-url …/a2a/seller_agent` | Hand-crafted JSON-RPC `message/send` — see Agent Card discovery and task-state transitions. |
 | 11 | `python m3_adk_multiagents/adk_demos/a2a_11_context_threading.py --seller-url …/a2a/seller_agent` | Reuse `contextId` across rounds — multiple A2A calls become **one threaded conversation**. |
-| 12 | `python m3_adk_multiagents/adk_demos/a2a_12_parts_and_artifacts.py --seller-url …/a2a/seller_agent` | Multi-part Messages (`TextPart` + `DataPart`) and inspecting Artifacts returned by the agent. |
+| 12 | `python m3_adk_multiagents/adk_demos/a2a_12_parts_and_artifacts.py --seller-url …/a2a/seller_agent` | Multi-part Messages (`TextPart` + `DataPart`) and inspecting tool-call DataParts in history. |
 | 13 | `python m3_adk_multiagents/adk_demos/a2a_13_streaming.py --seller-url …/a2a/seller_agent` | `message/stream` over SSE — task lifecycle events arrive in real time. |
 | 14 | `python m3_adk_multiagents/a2a_14_orchestrated_negotiation.py` | Full **buyer ↔ seller multi-round negotiation** over A2A — Agent Card discovery + threaded `message/send`. |
 
@@ -1211,6 +1211,12 @@ One distinction that trips people up: **Runner vs Session.** They sound similar;
 
 > *The simplest ADK agent. `root_agent = LlmAgent(name='basic_agent', model='openai/gpt-4o', instruction='You are a real estate expert when asked about properties.', tools=[get_quick_estimate])` plus a plain Python function `get_quick_estimate`. Key points: LlmAgent = model + instruction + tools; root_agent is the variable adk web discovers; function tool reads variable name + docstring + type hints → JSON schema; the LLM decides whether to call tools — not scripted. Try it: ask 'What's 742 Evergreen Terrace worth?' (uses tool, $462K high confidence); 'What about 999 Unknown Ave?' (uses tool, low confidence); 'What's the best neighborhood in Austin?' (no tool — LLM knowledge). The LLM decides when tools are relevant.*
 
+> **Run command:**
+> ```bash
+> # Run ALL demos (9 agents appear in the dropdown)
+> adk web m3_adk_multiagents/adk_demos/
+> ```
+
 "Demo 01 — the simplest possible ADK agent. Three lines of code declare an entire agent.
 
 `root_agent = LlmAgent(name='basic_agent', model='openai/gpt-4o', instruction='You are a real estate expert...', tools=[get_quick_estimate])`. That's it. Plus a plain Python function `get_quick_estimate(address: str)` decorated as a tool.
@@ -1658,27 +1664,38 @@ This is the same architectural shift HTTP brought to web services twenty years a
 
 The whole document lives at the URL `/.well-known/agent-card.json`. **`/.well-known/`** is an IETF convention for service discovery — the same prefix you'd find for `/.well-known/openid-configuration` for OAuth or `/.well-known/security.txt` for security contacts. **Self-describing services have a long tradition; A2A inherits it.**
 
-What does a client *learn* from the card? *What this agent does* — from description and skills. *Where to send messages* — from url. *What features are supported* — from capabilities. *No documentation needed.* This is the same magic as MCP's `tools/list` — except for entire agents instead of tools."
+What does a client *learn* from the card? *What this agent does* — from description and skills. *Where to send messages* — from url. *What features are supported* — from capabilities. *No documentation needed.* This is the same magic as MCP's `tools/list` — except for entire agents instead of tools.
+
+**Practical tip for the demo:** as soon as you run `adk web --a2a m3_adk_multiagents/negotiation_agents/`, you can browse the Agent Cards directly in your browser — no script needed. ADK reads each agent's `agent.json` file and serves it automatically:
+- http://127.0.0.1:8000/a2a/buyer_agent/.well-known/agent-card.json
+- http://127.0.0.1:8000/a2a/seller_agent/.well-known/agent-card.json
+- http://127.0.0.1:8000/a2a/negotiation/.well-known/agent-card.json
+
+Three URLs, three Agent Cards — one per agent folder. The JSON you see in the browser comes from the `agent.json` file in each agent's directory (e.g., `negotiation_agents/buyer_agent/agent.json`). **The Agent Card isn't generated at runtime — it's a static file you author, and `adk web --a2a` hosts it for you.**"
 
 ---
 
 ## Slide 80 — Demo 10: A2A Wire Format (Concept)
 
-> *Raw JSON-RPC + Task Lifecycle. Three steps: GET /a2a/seller_agent/.well-known/agent-card.json — discover the agent; POST /a2a/seller_agent (valid offer $440K) — task: completed, counter at $477K; POST /a2a/seller_agent (broken envelope) — task: still completed (LLM handled it). JSON-RPC payload: {"jsonrpc":"2.0", "method":"message/send", "params":{"message":{"parts":[{"kind":"text","text":"...offer JSON..."}]}}}. Response contains: status:"completed" (the agent processed the request); contextId (reuse for round 2 in demo 11); artifacts (counter-offer text as durable output); history (full message exchange). Key insight: completed means the PROTOCOL worked — not that the negotiation succeeded.*
+> *Raw JSON-RPC + Task Lifecycle. Three steps: (1) GET /a2a/seller_agent/.well-known/agent-card.json — discover the agent; (2) POST /a2a/seller_agent with valid offer ($440K, full offer JSON with session_id, round, price, message_type, conditions, closing_timeline) — task: completed, counter at $477K because $440K < floor $445K; (3) POST /a2a/seller_agent with broken envelope (only `{"from_agent":"buyer","message":"broken"}` — missing session_id, price, round, message_type, conditions) — task: STILL completed because the JSON-RPC envelope was valid; the LLM treated it as a general inquiry and dumped its full property analysis. What's "broken" is the application-level content inside the TextPart, NOT the JSON-RPC wrapper. Both requests have valid jsonrpc/id/method/params/message/parts — the protocol layer is fine. The difference is what's INSIDE the TextPart. Key insight: completed means the PROTOCOL worked — not that the content was good.*
 
-"Demo 10 — the **raw wire frames** of A2A. Same way Demo 01 of MCP showed you the protocol on the wire.
+"Demo 10 — the **raw wire frames** of A2A. Same way Demo 01 of MCP showed you the protocol on the wire. No A2A SDK here — just raw `httpx` HTTP calls so you see every byte.
 
-Three steps. **One — `GET /a2a/seller_agent/.well-known/agent-card.json`** — discover the agent. Get back the JSON we just looked at.
+Three steps. **One — `GET /a2a/seller_agent/.well-known/agent-card.json`** — discover the agent. Get back the Agent Card JSON we saw on Slide 79 — name, description, skills, capabilities, URL.
 
-**Two — `POST /a2a/seller_agent`** with a JSON-RPC payload like *'I offer $440K for 742 Evergreen.'* The seller's response: **task `completed`, counter-offer at $477K.**
+**Two — `POST /a2a/seller_agent`** with a valid offer. The TextPart contains a well-formed JSON string with all the fields the seller needs: `session_id`, `round: 1`, `from_agent: buyer`, `message_type: OFFER`, `price: 440000`, a human-readable message, conditions, and closing timeline. **This is a complete, structured offer.** The seller agent calls its MCP tools, discovers the floor is $445K, recognizes $440K is below it, and responds: *'Offer below our minimum of $445,000. Would you consider increasing?'* **Task status: `completed`, counter-offer at $477K.**
 
-**Three — `POST` with a deliberately broken envelope.** Maybe the JSON is malformed; maybe the schema is wrong. *Surprise: task `completed` again.* Why? Because the LLM is forgiving — it parsed the broken envelope, understood intent, and responded anyway. **A2A doesn't crash on broken inputs at the protocol level — it leaves it to the agent.**
+**Three — `POST` with a broken envelope.** Now look at what we send: `{\"from_agent\": \"buyer\", \"message\": \"broken\"}`. **That's it.** No `session_id`. No `round`. No `price`. No `message_type`. No `conditions`. No `closing_timeline_days`. Just two fields — a sender name and the word *'broken'*.
 
-The JSON-RPC payload structure is at the bottom. `jsonrpc: 2.0`, `method: message/send`, `params: { message: { parts: [{ kind: text, text: ... }] } }`. **Same JSON-RPC envelope as MCP**, just a different `method` name. If you've seen one, you've seen the other.
+Here's what's crucial to understand: **the JSON-RPC envelope is perfectly valid in both cases.** Both requests have `jsonrpc: 2.0`, a unique `id`, `method: message/send`, and a properly-formed `params.message` with `messageId`, `role: user`, and `parts: [{kind: text, text: ...}]`. **The A2A protocol layer has no complaints.** It delivered the message to the agent. What's *broken* is the **application-level content inside the TextPart** — the offer data that the seller agent's *business logic* expects.
 
-The response contains four things. **`status: completed`** — the agent processed the request. **`contextId`** — a UUID you can reuse for the next round to thread the conversation. We'll see that in Demo 11. **`artifacts`** — durable outputs the agent produced; in this case, the counter-offer text. **`history`** — the full message exchange, useful for replay.
+*Surprise: task `completed` again.* The LLM didn't crash, didn't error, didn't even ask for clarification. Instead, it treated the vague message as a general inquiry and **dumped its entire property analysis** — listing price, upgrades, comparable sales, market conditions, *and the floor price*. **The LLM coped by being maximally helpful with what it had.** A2A doesn't crash on garbage content — it delivers the message to the agent, and the agent (the LLM) handles it however it can.
 
-The teal callout is the warning: ***'completed' means the PROTOCOL worked — not that the negotiation succeeded.*** Don't conflate the two. The seller agent could process your message, write a polite counter-offer, and the deal is *still* nowhere close to done. *Status is about the round trip, not the negotiation outcome.*
+The JSON-RPC payload structure: `jsonrpc: 2.0`, `method: message/send`, `params: { message: { parts: [{ kind: text, text: ... }] } }`. **Same JSON-RPC envelope as MCP**, just a different `method` name. If you've seen one, you've seen the other.
+
+The response contains four things. **`status: completed`** — the agent processed the request. **`contextId`** — a UUID you can reuse for the next round to thread the conversation. We'll see that in Demo 11. **`artifacts`** — durable outputs the agent produced; for the valid offer, the counter-offer text; for the broken envelope, the property analysis dump. **`history`** — the full message exchange, useful for replay.
+
+The teal callout is the warning: ***'completed' means the PROTOCOL worked — not that the negotiation succeeded.*** The seller agent could process your message, dump its entire strategy, and the deal is *still* nowhere close to done. *Status is about the HTTP round trip, not the negotiation outcome.* A task only gets `status: failed` on actual protocol errors or server crashes — never on bad content.
 
 Before we move on, let me give you the **vocabulary** that everything else in A2A is built on. **Four objects.** Memorize these.
 
@@ -1707,75 +1724,95 @@ If you understood ADK sessions and MCP tool calls in the previous modules, **you
 
 ## Slide 81 — Demo 10: Results — What the Wire Looks Like
 
-> *Valid offer response: status:'completed', contextId:'4f0fff3e-...', artifacts:[{text:'Counter-offer at $477,000...'}], history:[Message(user), Message(agent)]. Broken envelope response: status:'completed' (NOT failed!), artifacts:[{text:'Could you please resend your offer?'}]. Why still completed? The A2A protocol layer worked correctly — valid JSON-RPC, valid Message. The content was garbage but the LLM coped. Tasks only fail on protocol errors or server crashes. Field guide: status (task state); contextId (thread ID for multi-turn); history (all messages exchanged); artifacts (durable outputs).*
+> *Valid offer: TextPart contains full offer JSON (session_id, round, price: 440000, message_type: OFFER, conditions, closing_timeline_days). Response: status:'completed', contextId:'ee07ea6e-...', artifacts:[{text:'Offer below our minimum of $445,000...counter at $477,000'}], history:[Message(user), Message(agent)]. Broken envelope: TextPart contains only `{"from_agent":"buyer","message":"broken"}` — missing every business field. Response: status:'completed' (NOT failed!), artifacts:[{text:'Listing Price $485,000... Minimum Acceptable Price $445,000... recommend counter-offer starting at $477,000'}]. The LLM didn't ask for clarification — it treated the vague message as a general inquiry and dumped its FULL property analysis including the floor price. Both requests had identical, valid JSON-RPC envelopes — the protocol didn't care about the content. "Broken" = application-level content, not protocol-level structure.*
 
-"Demo 10 results — making the abstract protocol very concrete.
+"Demo 10 results — making the abstract protocol very concrete. **Side-by-side, the two requests teach everything you need to know about where the protocol ends and the agent begins.**
 
-**Valid offer response.** Status is `completed`. ContextId is a UUID — note it down, you'll reuse it in the next round. Artifacts contains the counter-offer as text. History contains both messages — the user's offer and the agent's response.
+**Valid offer response.** Status is `completed`. ContextId is a UUID — save it, you'll reuse it in Demo 11. The artifact contains the seller's counter-offer: *'Offer below our minimum of $445,000. Would you consider increasing? Counter at $477,000.'* The seller called its MCP tools, got the floor price, compared $440K < $445K, and crafted a structured response. History contains both messages — the user's offer and the agent's response. **This is exactly how a real A2A negotiation round looks on the wire.**
 
-**Broken envelope response.** Status is *still `completed`*. **Not `failed`.** Even though the payload was malformed garbage, the A2A protocol layer did its job — JSON-RPC parsed, the Message object was valid. The *content* of the message was nonsense, but the LLM coped — it just asked *'could you please resend your offer?'* and called the task done.
+**Broken envelope response.** Status is *still `completed`*. **Not `failed`.** Look at both requests side by side — *the JSON-RPC wrappers are identical in structure.* Both have `jsonrpc: 2.0`, a unique `id`, `method: message/send`, a proper `message` with `messageId`, `role: user`, and a `parts` array containing one TextPart. **The protocol layer saw two perfectly valid requests.** It has no opinion about what's *inside* the TextPart.
 
-The italic note explains it: ***tasks only fail on protocol errors or server crashes.*** Bad content is not a task failure — it's an agent behavior. The agent might respond with an apology or a clarifying question, but the *task* is still complete. **The semantics of A2A Task status are about the round trip, not about success of the underlying intent.**
+The difference is entirely in the content. The valid request's TextPart carries a JSON string with seven fields — session_id, round, from_agent, to_agent, message_type, price, message, conditions, closing_timeline_days. The broken request's TextPart carries `{\"from_agent\": \"buyer\", \"message\": \"broken\"}`. Two fields. No price. No round. No offer type. **The word 'broken' is literally the message.**
 
-The four-row table is your reference card for what's in a Task response. **Status** — completed or failed. **ContextId** — thread ID for multi-turn. **History** — all Messages exchanged. **Artifacts** — durable outputs the agent produced. *Memorize these four fields and you've memorized A2A Task semantics.*"
+What did the LLM do with this garbage? **It didn't ask for clarification.** It didn't say *'could you please resend your offer?'* Instead, it treated the vague message as a general inquiry and **dumped its entire property analysis** — listing price $485K, upgrades worth $75K, comparable sales, market conditions, *and the seller's minimum acceptable price of $445K*. The LLM called all its MCP tools, gathered every piece of data it could, and presented a full strategic briefing. **It coped by being maximally helpful with whatever information it had.**
+
+This is both impressive and **alarming from a security perspective.** The broken envelope got the seller to volunteer its floor price — $445K — without even asking for it. *In a real adversarial scenario, a vague or confusing message might trick an agent into over-sharing.* That's a prompt-injection vector. **This is why the `before_tool_callback` allowlist from Demo 08 matters — even if the LLM decides to be overly helpful, the callback can block access to sensitive tools.**
+
+Three lessons from this slide.
+
+**One — 'broken' is relative.** The A2A protocol is fine. The JSON is valid. The Message structure is correct. What's broken is the *business-level content* — the offer semantics the seller agent expects. **The protocol is not your validator. Your agent is.**
+
+**Two — `completed` vs `failed` is a protocol-level distinction.** Tasks fail on JSON-RPC parse errors, missing required protocol fields, or server crashes. *Bad content is not a task failure.* The agent processes the message — however poorly — and the task completes. **Don't use task status as a business-logic success indicator.** If you need to know whether the negotiation succeeded, check the artifact content, not the task status.
+
+**Three — LLMs are resilient but unpredictable.** The LLM handled the garbage gracefully — no crash, no error. But its *response* was non-deterministic. Sometimes it asks for clarification. Sometimes it dumps everything it knows. Sometimes it makes assumptions. **If your agent needs predictable behavior on bad input, validate the TextPart content in application code *before* passing it to the LLM.** Don't rely on the LLM to fail gracefully in a way you can predict.
+
+The four-row field guide for what's in every A2A Task response: **Status** — completed or failed (protocol-level). **ContextId** — thread ID for multi-turn (reuse in Demo 11). **History** — all Messages exchanged (full conversation). **Artifacts** — durable outputs the agent produced (the deliverable). *Memorize these four fields and you've memorized A2A Task semantics.*"
 
 ---
 
 ## Slide 82 — Demo 11: Context Threading (Concept) — Multi-Turn Negotiations via contextId
 
-> *Three rounds, same contextId, the seller remembers everything: Round 1 — offer $432K → 'Below floor ($445K). Counter at $477K.' Round 2 — offer $440K → 'STILL below $445K. Consider $477K.' Round 3 — offer $446K → 'Above $445K. We ACCEPT! Congratulations!'. Mechanism: Round 1 POST → server assigns contextId. Round 2 POST + contextId → seller remembers round 1. Round 3 POST + contextId → seller sees full history → ACCEPTS. Without contextId, the seller would counter at $477K every time — no memory of prior offers.*
+> *Four rounds — three with the same contextId, one without. Round 1 — offer $432K → 'Below floor ($445K). Counter at $477K.' Round 2 — offer $440K → 'STILL below $445K. As previously mentioned...' Round 3 — offer $446K → 'Meets minimum. We ACCEPT! Congratulations!' Round 4 (bonus, NO contextId) — offer $440K again → 'Below our minimum of $445K. Would you increase?' (no memory, fresh conversation). Mechanism: Round 1 POST → server assigns contextId. Rounds 2-3 POST + contextId → seller remembers. Round 4 POST without contextId → new contextId assigned → seller has ZERO memory. Round 2 vs Round 4 is the proof — same $440K, opposite responses.*
 
 "Demo 11 — **multi-turn negotiations via contextId.** This is how A2A handles conversational state.
 
-Look at the table. Three rounds. *Same contextId across all three.*
+Look at the table. **Four rounds.** Three with the same contextId, then a bonus round without it.
 
 **Round 1.** Buyer offers $432K. Seller checks its floor — $445K — sees the offer is below, counters at $477K.
 
-**Round 2.** Buyer comes up to $440K. Seller — *because it has the contextId* — *remembers* that round 1 happened, that the floor is $445K, that the buyer is climbing. Seller responds *'still below $445K, consider $477K.'* Notice the seller didn't have to re-discover the floor; it remembered.
+**Round 2.** Buyer comes up to $440K. Seller — *because it has the contextId* — *remembers* that round 1 happened, that the floor is $445K, that the buyer is climbing. Seller responds *'still below $445K, as previously mentioned...'* Notice the language: *'as previously mentioned'* — the seller is referencing round 1. It didn't have to re-discover the floor; it remembered.
 
-**Round 3.** Buyer offers $446K. Seller sees the full history, sees that the offer is *now* above the floor, **accepts immediately.** *'We ACCEPT! Congratulations!'*
+**Round 3.** Buyer offers $446K. Seller sees the full history, sees that the offer is *now* above the floor, **accepts immediately.** *'Meets the minimum. We ACCEPT! Congratulations!'*
 
-The mechanism: Round 1's POST gets back a contextId from the server. The buyer reuses that contextId on Round 2's POST. Server looks up the conversation, replays it, and the agent picks up where it left off.
+**Round 4 — the proof.** Now we send $440K *again* — **the exact same price as round 2** — but this time *without contextId*. The server assigns a brand-new contextId. The seller has **zero memory** of rounds 1-3. It calls its MCP tools fresh, re-discovers the $445K floor, and responds *'below our minimum of $445K. Would you increase?'* — as if it's never seen this buyer before.
 
-The teal callout is the *crucial* point: ***without contextId, the seller would counter at $477K every time — no memory of prior offers.*** Each request would be a fresh conversation. There would be no progress. **ContextId is what turns A2A from a one-shot RPC into a real multi-turn protocol.**"
+**Compare round 2 to round 4.** Same price. Same seller. Same MCP tools. But round 2 says *'as previously mentioned'* — memory. Round 4 says *'I must inform you'* — first contact. **ContextId is the ONLY difference.**
+
+You can even see it in the history arrays. Round 2's history has no tool-call DataParts — the seller *remembered* the floor from round 1. Round 4's history has DataParts for `get_market_price` and `get_inventory_level` — the seller had to call MCP tools fresh because it had no prior context. **Tool calls reappear when memory is lost.**
+
+The teal callout is the *crucial* point: ***contextId is what turns A2A from a one-shot RPC into a real multi-turn protocol.*** Drop it, and every request is a clean slate — no progress, no negotiation, no memory."
 
 ---
 
 ## Slide 83 — Demo 11: Results — Why Memory Matters
 
-> *Same contextId across all 3 rounds: 4498d50f-a61e-4a17-8c84-0ea13d49a283. The seller accepted in round 3 because it remembered: Round 1: MCP tool returned floor price = $445K; Round 2: buyer came up from $432K to $440K (still below); Round 3: $446K > $445K → ACCEPT immediately. Key takeaway: contextId = A2A's session_id. It ties independent HTTP requests into one coherent conversation. The same concept as ADK's session state (d03), but across network boundaries.*
+> *Rounds 1-3 share contextId 46cc0efb. Round 4 gets a new contextId dccf15c3. The seller accepted in round 3 because it remembered: Round 1: MCP tool returned floor price = $445K; Round 2: buyer came up from $432K to $440K (still below); Round 3: $446K > $445K → ACCEPT immediately. Round 4 ($440K, NO contextId): seller re-discovers floor via MCP tools → 'below our minimum' → no memory of rounds 1-3. Key takeaway: contextId = A2A's session_id. Round 2 vs round 4 — same price, opposite responses — is the definitive proof.*
 
 "Demo 11 results — the *memory* in action.
 
-**Same contextId across all three rounds.** A single UUID. Each POST carries it. Server uses it to retrieve the conversation history.
+**Rounds 1-3 share one contextId.** A single UUID. Each POST carries it. Server uses it to retrieve the conversation history.
 
 The bullet list shows what the seller remembered, round by round. *Round 1: MCP tool returned floor price $445K.* That fact is now in the conversation history. *Round 2: buyer came up from $432K to $440K — still below.* That fact gets added. *Round 3: $446K — above $445K — ACCEPT.* The decision is based on **all three rounds of context.**
 
+**Now look at round 4.** Same $440K as round 2. But no contextId sent — server assigned a fresh one. The seller had to call MCP tools *again* to re-discover the floor. It responded as if meeting the buyer for the first time.
+
+**Three pieces of evidence for memory loss in round 4:** First, the *language* changed — round 2 says *'as previously mentioned,'* round 4 says *'I must inform you.'* Second, the *contextId* is different — new UUID, new conversation. Third, the *history* contains **MCP tool-call DataParts** (get_market_price, get_inventory_level) — proving the seller queried its tools fresh. Rounds 2-3 have *no* tool-call DataParts because the seller remembered the floor from round 1.
+
 The teal takeaway is the conceptual mapping: ***contextId = A2A's session_id.*** It's the cross-network equivalent of what ADK's session state does within a single process. *Both serve the same purpose — tying independent requests into one coherent conversation.* Within ADK, session state lives in SQLite or Redis. Across A2A, contextId points to a server-side conversation store. **Different storage, same idea.**
 
-If you understood ADK's session state in Demo 03, you understand contextId. *Memory is memory; the wire just changes.*"
+Round 2 vs round 4 isn't a thought experiment — **it's a live demo you just ran.** Same price, same seller, same tools, opposite responses. **contextId is the only difference.**"
 
 ---
 
-## Slide 84 — Demo 12: Parts & Artifacts (Concept) — Multi-Part Messages + Durable Outputs
+## Slide 84 — Demo 12: Multi-Part Messages (Concept) — Same Intent, Multiple Formats
 
-> *Sent a message with TWO parts — same offer in two formats: parts[0] = TextPart('Final-and-best at $445k') (human-readable); parts[1] = DataPart({hint: 'machine copy', offer: {...}}) (structured JSON). Part-type table: TextPart (human-readable text, the LLM reads); DataPart (structured JSON, code/downstream systems read); FilePart (binary PDF/image, not used here); Artifact (durable output on Task, anyone fetching the Task later reads). Parts = conversational (in Messages). Artifacts = deliverables (on Tasks).*
+> *Sent a message with TWO parts — same offer in two formats: parts[0] = TextPart('Final-and-best at $445k') (human-readable); parts[1] = DataPart({hint: 'machine copy', offer: {...}}) (structured JSON). Part-type table: TextPart (human-readable text, the LLM reads); DataPart (structured JSON, code/downstream systems read); FilePart (binary PDF/image, not used here). Same intent, two audiences — the LLM gets prose, downstream code gets structured JSON.*
 
-"Demo 12 — **Parts and Artifacts.** This is one of A2A's more subtle features, and it pays off in production.
+"Demo 12 — **multi-part messages.** This is one of A2A's more subtle features, and it pays off in production.
 
 A single Message can have **multiple Parts** — different representations of the same intent. The example shows one Message with two Parts. **Part 0** — a TextPart with *'Final-and-best at $445k'* — human-readable, what the LLM will read. **Part 1** — a DataPart with structured JSON `{hint: 'machine copy', offer: {...}}` — what *downstream code* will read.
 
 Why? **Same intent, two audiences.** The LLM wants prose to reason over. The audit-logging system wants structured JSON to validate and store. The CRM that records the offer wants typed fields. By sending both parts in one Message, *every consumer gets the format it prefers — without parsing.*
 
-Look at the four-row table. **TextPart, DataPart, FilePart** — three Part types within Messages. **Artifact** is different — it's a *durable output attached to the Task itself*. Anyone who fetches the Task object later — for audit, for replay, for analytics — gets the artifact.
+Look at the table. **TextPart, DataPart, FilePart** — three Part types. TextPart is free text for LLMs. DataPart is structured JSON for code. FilePart is binary data with a MIME type — PDFs, images, documents.
 
-The teal callout is the slogan: ***Parts = conversational (in Messages). Artifacts = deliverables (on Tasks).*** Parts are the *grain* of a single message. Artifacts are the *output* of the entire task. Use both for max expressiveness."
+The teal callout is the key insight: ***same intent, two audiences — the LLM gets prose, downstream code gets structured JSON.*** In production agent systems, this is how you avoid the fragile pattern of having code parse LLM text output. Send a DataPart alongside the TextPart, and the machine never has to guess."
 
 ---
 
-## Slide 85 — Demo 12: Results — Acceptance at $445K
+## Slide 85 — Demo 12: Results — Tool Calls as DataParts
 
-> *Response history showed the full agent processing: User message — 2 parts (TextPart + DataPart); Agent MCP tool calls — 3 DataParts (get_market_price, get_minimum_acceptable_price, calculate_discount); Agent tool results — 3 DataParts (structured responses); Agent final text — 'We accept your offer of $445,000!'. Artifact — same acceptance text as durable output: {artifactId:'f7ae8903-...', parts:[{kind:'text', text:'We accept...'}]}. $445K = exact floor → immediate acceptance. MCP tool confirms min = $445K, offer matches, seller accepts. Tool calls appear as DataParts in history — you can programmatically inspect what tools were called.*
+> *Response history showed the full agent processing: User message — 2 parts (TextPart + DataPart); Agent MCP tool calls — 3 DataParts (get_market_price, get_minimum_acceptable_price, calculate_discount); Agent tool results — 3 DataParts (structured responses); Agent final text — 'We accept your offer of $445,000!'. $445K = exact floor → immediate acceptance. Tool calls appear as DataParts in history — you can programmatically inspect what tools were called.*
 
 "Demo 12 results — and this is one of the best slides in the deck for showing **how rich A2A's history is.**
 
@@ -1783,7 +1820,7 @@ The user sent a Message with two Parts. The agent then made **three MCP tool cal
 
 **Every piece of the agent's reasoning is in the history.** You can fetch the Task later and *programmatically inspect which tools were called, with which arguments, and what they returned.* That's **observability across an A2A network boundary** — even though the seller is on a different machine, the buyer can audit exactly what the seller did.
 
-The artifact at the bottom is the *durable output*. Same acceptance text, but attached to the Task as a first-class artifact, not just as a message in history. Why both? Because messages are *conversational ephemera* — they could be summarized, truncated, archived. Artifacts are *durable* — they're the agreed-upon output of the task and are guaranteed to be retrievable as long as the task exists.
+Remember what we saw in Demo 11, round 4? Tool-call DataParts showed up in the history because the seller had no contextId and had to re-query MCP tools. Here you see the same thing — **DataParts are how A2A exposes tool usage.** They're not just for sending structured offers; they're the protocol's observability mechanism.
 
 The bottom italic line is your power-tool: ***tool calls appear as DataParts in history — you can programmatically inspect what tools were called.*** Production agent systems use this for compliance, debugging, and analytics. **A2A doesn't just deliver messages; it delivers a structured trace of agent reasoning.**"
 

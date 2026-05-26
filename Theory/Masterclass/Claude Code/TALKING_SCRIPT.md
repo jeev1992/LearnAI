@@ -1,14 +1,52 @@
 # Talking Script — Inside Claude Code: System Design of an Agentic CLI
 
-> Read this script directly while presenting each slide. Speaker notes in [SPEAKER NOTE] blocks are asides you say verbally — they are NOT on the slides.
+
 
 ---
 
 ## SLIDE 1 — Title
 
-Welcome everyone. Today we're going inside Claude Code — Anthropic's agentic CLI that has crossed a billion dollars in run-rate revenue since becoming generally available in May 2025.
+[IK presenter opens the session — welcomes the audience and introduces today's masterclass: "Inside Claude Code — AI System Design of an Agentic Era."]
 
-Before we touch any architecture, let me paint a picture of what actually happens when you use this thing. Imagine you're in your terminal, inside your repo. You describe a new feature you want to implement — plain English, one sentence. Here's what happens next.
+---
+
+## SLIDE 2 — About IK / Your Host
+
+A quick word about Interview Kickstart. Ten-plus years preparing engineers for top companies. Over 25,000 professionals trained across FAANG and AI-native companies. And over 700 FAANG and tier-one mentors on our roster. By the end of this session, you'll have a complete design blueprint for an agentic CLI you can take to your team.
+
+[SPEAKER NOTE: IK's site says "trained," not "placed" — and "mentors," not "hiring managers." Frame it honestly.]
+
+---
+
+## SLIDE 3 — IK Instructors
+
+These are the people behind the curriculum — AI/ML engineers, hiring managers, and recruiters from FAANG and tier-one companies. Courses are designed and delivered by practitioners who've actually shipped this stuff at scale.
+
+---
+
+## SLIDE 4 — Introduction: Jeevendra Singh
+
+Hi everyone, my name is Jeevendra Singh. I'm a Software Engineer at Microsoft, with about 11 years of experience in the industry. Over those years I've worked across the stack — building distributed systems, shipping products, and more recently spending a lot of time in the AI and agentic tooling space, which is exactly what brought me to today's session.
+
+At Microsoft I've developed and deployed several agents to production. And if you've tried taking an agent from a prototype to a real production deployment, you know that building the agent is only half the battle. The harder half is everything that comes after — passing compliance reviews like Responsible AI, running rigorous evaluations to make sure the agent behaves correctly across edge cases, and meeting the bar your organization sets before anything goes live. That experience — shipping agents through that full gauntlet — is a big part of why I wanted to do this session. The design decisions we'll cover today aren't academic. They're the same kinds of choices you face when you're trying to get an agent past compliance and into the hands of real users.
+
+I put this session together because I wanted to take something I've been using heavily — Claude Code — and break it open. Not just "here's how to use it," but "here's how you'd design it from scratch if you were the engineer building it." That's the lens we'll use today. So with that, let's jump in.
+
+---
+
+## SLIDE 5 — Agenda (divider)
+
+[Jeevendra takes over here.]
+
+Thanks, [IK presenter name]. 
+
+Hello everybody! Good evening.
+
+Welcome to this masterclass on System Design of Claude Code. 
+
+Today we're going inside Claude Code — Anthropic's agentic CLI that has crossed a billion dollars in revenue since becoming generally available in May 2025.
+
+Before we touch any architecture, let me paint a picture of what actually happens when you use this thing. Imagine you're in your terminal, inside your repo. You describe a new feature you want to implement — plain English, few sentences. Here's what happens next.
 
 Claude Code reads your codebase — it searches for the relevant files, opens them, understands the existing structure. Then it edits the code — adds imports, writes new logic, updates configs. Then it runs your tests to check nothing broke. If a test fails, it reads the error, fixes the code, and re-runs. All of this happens in a loop — read, think, act, repeat — without you pressing a single button.
 
@@ -26,27 +64,19 @@ So the question we're answering today is: how would you design Claude Code — t
 
 ---
 
-## SLIDE 2 — Agenda
+## SLIDE 6 — Agenda
 
-Here's our roadmap. We have 14 parts — each one covers a different aspect of the system. We'll start with foundations and requirements, then move into architecture, the CLI surface, tools, memory management, the model API, safety and permissions, extensibility, UX and streaming, evaluation, and finally real production incidents that happened with Claude Code. Along the way, we'll make 22 design decisions. Each part adds decisions to one architecture diagram, and we'll end with all 22 mapped to a single slide at the end.
-
----
-
-## SLIDE 3 — About IK / Your Host
-
-A quick word about Interview Kickstart. Ten-plus years preparing engineers for top companies. Over 25,000 professionals trained across FAANG and AI-native companies. And over 700 FAANG and tier-one mentors on our roster. By the end of this session, you'll have a complete design blueprint for an agentic CLI you can take to your team.
-
-[SPEAKER NOTE: IK's site says "trained," not "placed" — and "mentors," not "hiring managers." Frame it honestly.]
+You'll see twelve sections on the agenda here — each one covers a different aspect of the system. We'll start with foundations and requirements, then move into architecture, the CLI surface, tools, memory management, the model API, safety and permissions, extensibility, UX and streaming, and evaluation. After those twelve, we'll close with two short wrap sections — production reality and synthesis — that bring everything together. Along the way, we'll make 22 design decisions. Each part adds decisions to one architecture diagram, and we'll end with all 22 mapped to a single slide at the end.
 
 ---
 
-## SLIDE 4 — Section Divider: Foundations
+## SLIDE 7 — Section Divider: Foundations
 
 Part one — Foundations. Five minutes. Before we design anything, let's define what we're designing.
 
 ---
 
-## SLIDE 5 — What Does "Agentic CLI" Mean?
+## SLIDE 8 — What Does "Agentic CLI" Mean?
 
 Look at this two-by-two matrix. Two dimensions. First: how many steps does it take — is it a single action or a multi-step sequence? That's your columns. Second: who makes the decisions? If the code follows a fixed set of if-else rules — same input always gives the same output — that's deterministic. But if an AI model looks at the situation and decides what to do, it might choose differently next time even with the same input — that's model-driven or non-deterministic or also called a stochastic. That's your rows. 
 
@@ -54,25 +84,25 @@ Bottom-left: a script — single-step, deterministic. Bottom-right: a workflow �
 
 ---
 
-## SLIDE 6 — Six Hard Constraints
+## SLIDE 9 — Six Hard Constraints
 
 These six constraints shape every design decision we'll make today. One: it lives in the user's terminal — or as an extension in VS Code — so there's no rich web UI to fall back on if something breaks visually. Two: it edits files on the user's disk — files they will commit and ship. Three: it runs with the user's credentials — it can do real damage if misused. Four: non-deterministic output — you can ask the model to summarize the same text twice and get two different but perfectly valid summaries each time. That's the stochastic nature of LLMs — same input does not guarantee the same output. Five: it can work in two completely different modes — interactively, where you're sitting at your keyboard chatting with it and approving actions, AND headlessly, where it's running on its own inside a CI pipeline like GitHub Actions with nobody there to click "yes." Same codebase, two opposite experiences. Six: finite context window — the model can only "see" so much at once, so how you manage that limited memory isn't a side concern, it's a core part of the architecture.
 
 ---
 
-## SLIDE 7 — Section Divider: What Are We Building?
+## SLIDE 10 — Section Divider: What Are We Building?
 
 Part two — What are we building? Eight minutes. Define the problem before drawing any box diagrams.
 
 ---
 
-## SLIDE 8 — Problem Statement
+## SLIDE 11 — Problem Statement
 
 Here's the problem statement. Read it with me: Build a CLI tool that a developer runs inside their own repository, which can read and edit code, run shell commands, search the codebase, take multi-step actions, resume sessions, and integrate with their editor — using an LLM as the decision engine. Who uses it? A mid-senior software engineer. Where? Their own laptop, their own repo. What? Multi-step coding tasks. How long? Single session — minutes to hours.
 
 ---
 
-## SLIDE 9 — Functional Requirements
+## SLIDE 12 — Functional Requirements
 
 Since we are doing System design here, so we have to start with functional and non-functional requirements.
 
@@ -92,31 +122,31 @@ That's the feature surface.
 
 ---
 
-## SLIDE 10 — Non-Functional Requirements
+## SLIDE 13 — Non-Functional Requirements
 
 Now, how WELL must it do those things? These are illustrative requirements — they may not be exactly what Claude Code uses internally, but they're the kind of targets you'd set if you were designing this system yourself. Time to first token under 500 milliseconds. Self-healing reliability — it survives tool failures. Multi-layer safety — no rogue commands. Cost under 50 cents per complex request. Portability across three operating systems — macOS, Linux, and Windows. And model-swappable — the system is designed so you could swap in a different AI model without rewriting the whole application.
 
 ---
 
-## SLIDE 11 — Out of Scope
+## SLIDE 14 — Out of Scope
 
 Equally important: what are we NOT building? Not a chatbot — this is task-oriented, not JUST conversational. Not an IDE replacement — it complements, doesn't replace. Not a CI replacement — it augments CI. Not a shared multi-user environment — one developer, one session. Not a model trainer — we consume a model. 
 
 ---
 
-## SLIDE 12 — Section Divider: Scale & Constraints
+## SLIDE 15 — Section Divider: Scale & Constraints
 
 Part three — Scale and Constraints. Five minutes. Back-of-envelope numbers that anchor every later tradeoff.
 
 ---
 
-## SLIDE 13 — Back-of-Envelope Numbers
+## SLIDE 16 — Back-of-Envelope Numbers
 
 Let's put some numbers on the whiteboard. Again, these are illustrative — not published by Anthropic — but they're the kind of back-of-envelope estimates you'd put up in a system design interview to anchor your tradeoffs. About 50K concurrent users at peak. Roughly 2 million sessions per day. Median 15 turns per session. One to ten tool calls per turn, parallelized where safe. Five to thirty thousand tokens per turn after cache. Cost ceiling under 50 cents per complex request. And a TTFT — time to first token — target of 500 milliseconds for that conversational feel.
 
 ---
 
-## SLIDE 14 — AI-Specific Constraints
+## SLIDE 17 — AI-Specific Constraints
 
 So what makes this Claude Code CLI different from your usual command line interface? 
 
@@ -131,13 +161,13 @@ These constraints — and each one will drive a design decision later.
 
 ---
 
-## SLIDE 15 — Section Divider: High-Level Architecture
+## SLIDE 18 — Section Divider: High-Level Architecture
 
 Part four — High-Level Architecture. Ten minutes. Draw the box diagram. Components first; details later.
 
 ---
 
-## SLIDE 16 — Architectural Style Choice
+## SLIDE 19 — Architectural Style Choice
 
 Two options. On the left: a multi-agent graph — you have multiple specialized agents talking to each other, criss-crossing edges everywhere. This is the approach Google Antigravity takes, for example — it's designed to orchestrate multiple subagents in parallel across different workspaces, with separate agents handling everything from research to implementation to testing. Sounds powerful, but when something goes wrong, which agent made the bad call? The failure could be in any edge. 
 
@@ -148,7 +178,7 @@ And this is our first design decision out of the 22 Design Decisions as promised
 
 ---
 
-## SLIDE 17 — The 20-Line Agent
+## SLIDE 20 — The 20-Line Agent
 
 Here's the entire agent in about 20 lines of pseudocode. Recall the ReAct loop we talked about in the opening — reason, act, observe, repeat. Here's what it actually looks like in code. The user asks a question or gives a task. Claude Code takes that current question, the previous conversation history, and the list of available tools, and sends all of it to the model. Now, to answer that question or finish that task, the model might need more information — so it tells the agent which tools to invoke. "Read this file." "Run this test." The agent executes the tool, gets the result, and feeds it back to the model. Now the model has more context, so it decides: do I have enough to answer, or do I need another tool call? If it needs more, it asks for another tool. If it has enough, it responds with the final answer. That's the loop — the model keeps requesting tools until it has gathered everything it needs to complete the task. The entire brain of this billion-dollar product is a while loop with an if-else inside it. The loop itself is deliberately small and dumb. All the smart stuff — validation, permissions, sandboxing, caching — lives in the layers around it, not inside it. 
 
@@ -156,7 +186,7 @@ That's Design Decision 2: Keep the loop small. Push complexity to the edges.
 
 ---
 
-## SLIDE 18 — Five-Layer Architecture
+## SLIDE 21 — Five-Layer Architecture
 
 This is the master diagram — the one we'll keep coming back to for the rest of the session. Every design decision we make from here on will land in one of these five layers.
 
@@ -178,7 +208,7 @@ That's Design Decision 3: Layered separation — each layer owns one concern, ea
 
 ---
 
-## SLIDE 19 — Sequence Diagram
+## SLIDE 22 — Sequence Diagram
 
 Now let's see all five layers working together. Let's trace one real message through the entire stack — "fix the bug in auth.py."
 
@@ -200,13 +230,13 @@ That's one message, flowing through all five layers. Every message you send goes
 
 ---
 
-## SLIDE 20 — Section Divider: CLI Surface
+## SLIDE 23 — Section Divider: CLI Surface
 
 Part five — CLI Surface. Seven minutes. Why CLI, and how the terminal layer actually works.
 
 ---
 
-## SLIDE 21 — Surface Choice
+## SLIDE 24 — Surface Choice
 
 Where should this agent live? Three options.
 
@@ -222,7 +252,7 @@ That's Design Decision 4: CLI as the primary surface. Meet the developer where t
 
 ---
 
-## SLIDE 22 — Custom TUI Architecture
+## SLIDE 25 — Custom TUI Architecture
 
 Now that we've picked CLI, we need to render the output. Why build the terminal UI from scratch instead of using an existing library like ncurses — the standard C library that most terminal apps use for drawing text-based interfaces?
 
@@ -236,7 +266,7 @@ That's Design Decision 5: Build a custom TUI. Streaming output is a system desig
 
 ---
 
-## SLIDE 23 — Input State Machine
+## SLIDE 26 — Input State Machine
 
 The terminal isn't just rendering output — it also has to handle input. And input in Claude Code isn't simple, because the terminal can be in one of four different states at any time.
 
@@ -254,7 +284,7 @@ That's Design Decision 6: Treat input as a state machine. Interrupt and rewind a
 
 ---
 
-## SLIDE 24 — Distribution
+## SLIDE 27 — Distribution
 
 How does a developer actually install this thing? 
 
@@ -272,13 +302,13 @@ That's Design Decision 7: Distribute via npm plus native binary. Maximum reach, 
 
 ---
 
-## SLIDE 25 — Section Divider: Tools
+## SLIDE 28 — Section Divider: Tools
 
 Part six — Tools: The Agent's Hands. Eleven minutes. How the agent takes action in the real world.
 
 ---
 
-## SLIDE 26 — Tool Contract
+## SLIDE 29 — Tool Contract
 
 Every tool in Claude Code — Read File, Edit File, Bash, Grep, all 50-plus of them — has to follow the same five-part contract. Think of it as a checklist: if a tool doesn't fill out all five parts, it doesn't get registered.
 
@@ -298,7 +328,7 @@ That's Design Decision 8: Every tool must fill out all five parts. Skip one, los
 
 ---
 
-## SLIDE 27 — Dispatch Pipeline
+## SLIDE 30 — Dispatch Pipeline
 
 We just defined the five-part contract every tool must have. Now let's look at what happens when the model actually calls a tool. Every single tool call — Read File, Edit File, Bash, Grep, all of them — goes through the same pipeline before the result ever makes it back to the model.
 
@@ -324,7 +354,7 @@ That's Design Decision 9: One pipeline, all tools. Cross-cutting concerns live i
 
 ---
 
-## SLIDE 28 — Parallel Tool Calls
+## SLIDE 31 — Parallel Tool Calls
 
 Sometimes the model wants to do multiple things at once. Say it needs to read five files to understand a feature — does it have to read them one at a time, waiting for each to finish before starting the next? That would be painfully slow.
 
@@ -338,7 +368,7 @@ The tradeoff is real in both directions. If you mark too many tools as concurren
 
 ---
 
-## SLIDE 29 — Self-Healing Patterns
+## SLIDE 32 — Self-Healing Patterns
 
 Things will go wrong. Tools will fail. The API will reject your request. Permissions will get denied. The question isn't whether failures happen — it's whether the system recovers on its own OR crashes and waits for a human. Claude Code has five self-healing patterns, and every single one exists because something broke in their production and they learnt from it and refined.
 
@@ -358,13 +388,13 @@ That's Design Decision 10: Every reliability mechanism has a postmortem behind i
 
 ---
 
-## SLIDE 30 — Section Divider: Memory & Context
+## SLIDE 33 — Section Divider: Memory & Context
 
 Part seven — Memory and Context. Twelve minutes. Designing memory for a model that has none.
 
 ---
 
-## SLIDE 31 — Memory Tiers
+## SLIDE 34 — Memory Tiers
 
 Remember — the model has no memory of its own. Every turn, it starts from scratch. So the system has to provide memory for it — and not just one kind. Claude Code uses four distinct memory tiers, each with a different scope and a different storage backend.
 
@@ -382,7 +412,7 @@ That's Design Decision 11: Four memory layers, four scopes, each lives in the ri
 
 ---
 
-## SLIDE 32 — 200K Token Budget
+## SLIDE 35 — 200K Token Budget
 
 Now let's look at where those 200,000 tokens actually go — because this is one of those slides that changes how you think about context windows.
 
@@ -398,7 +428,7 @@ That leaves about 147,000 tokens of free working memory — only 74 percent of t
 
 ---
 
-## SLIDE 33 — Five-Layer Compression
+## SLIDE 36 — Compression Strategy
 
 So what happens when that 147K of free space starts running out? You compress. But not all compression is equal — some methods are free, some cost money, and some lose information. Claude Code stacks five compression layers, and the cheapest ones always fire first.
 
@@ -418,7 +448,7 @@ That's Design Decision 12: Try free options first. Reserve expensive operations 
 
 ---
 
-## SLIDE 34 — Compaction as a Transaction
+## SLIDE 37 — Compaction as a Transaction
 
 Now here's the key insight about compaction: it's not just about throwing stuff away. If all you did was delete old conversation to free up space, the model would lose critical context — it would forget what files it's working on, what the plan was, what project rules to follow. So compaction is actually two operations that must happen together as one atomic transaction: eviction AND rehydration.
 
@@ -446,7 +476,7 @@ That's Design Decision 13: Eviction and rehydration are one transaction. Design 
 
 ---
 
-## SLIDE 35 — Static/Dynamic Cache Boundary
+## SLIDE 38 — Static/Dynamic Cache Boundary
 
 Here's the cache boundary I teased in the last slide. This is one of the most important cost optimizations in the entire system.
 
@@ -466,13 +496,67 @@ That's Design Decision 14: Static prefix cached, dynamic suffix per-request. Thi
 
 ---
 
-## SLIDE 36 — Section Divider: Model API Layer
+## SLIDE 39 — TBD
+
+TBD
+
+---
+
+## SLIDE 40 — TBD
+
+TBD
+
+---
+
+## SLIDE 41 — TBD
+
+TBD
+
+---
+
+## SLIDE 42 — TBD
+
+TBD
+
+---
+
+## SLIDE 43 — TBD
+
+TBD
+
+---
+
+## SLIDE 44 — TBD
+
+TBD
+
+---
+
+## SLIDE 45 — TBD
+
+TBD
+
+---
+
+## SLIDE 46 — TBD
+
+TBD
+
+---
+
+## SLIDE 47 — TBD
+
+TBD
+
+---
+
+## SLIDE 48 — Section Divider: Model API Layer
 
 Part eight — Model API Layer. Six minutes. How we actually talk to the LLM.
 
 ---
 
-## SLIDE 37 — Tool-Call Protocol Choice
+## SLIDE 49 — Tool-Call Protocol Choice
 
 When the model decides it needs to call a tool — say, "read a file" — how does it actually communicate that request? There are three ways to do it, and this choice has real consequences for streaming, reliability, and portability.
 
@@ -488,7 +572,7 @@ That's Design Decision 15: Use tool_use natively. Pay the lock-in cost for nativ
 
 ---
 
-## SLIDE 38 — Model Routing
+## SLIDE 50 — Model Routing
 
 One agent, but not one model. Claude Code uses three different models, and it picks which one to call based on how hard the task is. Why? Because you wouldn't use a sword where a needle will do the job.
 
@@ -504,13 +588,13 @@ That's Design Decision 16: Route by task. Don't pay Opus prices for a yes/no cla
 
 ---
 
-## SLIDE 39 — Section Divider: Safety & Permissions
+## SLIDE 51 — Section Divider: Safety & Permissions
 
 Part nine — Safety and Permissions. Ten minutes. Defense in depth, ordered by cost.
 
 ---
 
-## SLIDE 40 — Threat Model
+## SLIDE 52 — Threat Model
 
 Start with this assumption: the model can be turned against you. It reads files, fetches URLs, runs commands — and any of that input could contain instructions designed to hijack it. So you design for five specific threats.
 
@@ -528,7 +612,7 @@ The closing thought here: behavioral safety — telling the model "don't do bad 
 
 ---
 
-## SLIDE 41 — Permission Cascade
+## SLIDE 53 — Permission Cascade
 
 Stop and give the answer as early and as cheaply as possible — don't escalate to an expensive check if a cheap one already has the answer. Five stages, cheapest first.
 
@@ -546,7 +630,7 @@ Design Decision 17: Deny wins. Cheap checks first, humans last.
 
 ---
 
-## SLIDE 42 — Kernel Sandboxing
+## SLIDE 54 — Kernel Sandboxing
 
 The permission cascade we just covered is software — it's code making decisions. But what if that code has a bug? What if a prompt injection tricks the model into bypassing a check? You need a second line of defense that doesn't depend on the application logic at all. That's where the operating system's kernel comes in.
 
@@ -562,7 +646,7 @@ Design Decision 18: Behavioral safety fails — the model will try to work aroun
 
 ---
 
-## SLIDE 43 — Six Permission Modes
+## SLIDE 55 — Six Permission Modes
 
 Think of it as a trust dial — six settings, from maximum caution to maximum speed.
 
@@ -584,13 +668,13 @@ Design Decision 19: Let the user pick their risk tolerance, but never give them 
 
 ---
 
-## SLIDE 44 — Section Divider: Extensibility
+## SLIDE 56 — Section Divider: Extensibility
 
 Part ten — Extensibility. Eight minutes. How does the system grow without forking?
 
 ---
 
-## SLIDE 45 — Customization Surfaces
+## SLIDE 57 — Customization Surfaces
 
 How do teams make Claude Code work their way — without changing the source code? Three customization surfaces, each at a different scope.
 
@@ -606,7 +690,7 @@ Design Decision 20: Three customization surfaces, three different scopes. Enterp
 
 ---
 
-## SLIDE 46 — Sub-Agents
+## SLIDE 58 — Sub-Agents
 
 Sometimes the main agent needs help. Say it's working on a large refactoring task — it needs to explore 50 files to understand the codebase, then plan the changes, then implement them. Doing all of that in one context window means the conversation gets enormous, and eventually you hit the context limit.
 
@@ -622,7 +706,7 @@ Design Decision 21: Sub-agents are an isolation tool, not an orchestration frame
 
 ---
 
-## SLIDE 47 — MCP and Lazy Loading
+## SLIDE 59 — MCP and Lazy Loading
 
 So far, every tool we've talked about — Read File, Edit File, Bash, Grep — is built into Claude Code. But what if you want to connect it to external services — GitHub, lack, Postgres, your company's internal APIs? That's what MCP does. MCP stands for Model Context Protocol — it's an open protocol that lets you plug external tools into Claude Code without writing custom integrations. Claude Code sits at the center like a hub, and each MCP server is a spoke connecting to a different service.
 
@@ -630,19 +714,19 @@ Here's the problem: every tool the model can use needs its full schema loaded in
 
 The fix is "lazy loading" — also called deferred loading. Instead of dumping every tool's full schema into the context upfront, the system only loads the tool names. Short labels, no details. When the model actually needs a specific tool, it calls tool_search — a lightweight lookup — and only then does the full schema get loaded into context. Think of it like a library catalog: you browse the titles first, and only pull the full book off the shelf when you need it.
 
-The savings are dramatic: about 5,000 tokens for 30 servers instead of 134,000. That's an 85 percent reduction in context usage. And it directly protects the cache boundary from SLIDE 35 — tool names are small and stable, so they stay in the static prefix. Full schemas are dynamic, so they load into the dynamic suffix only when needed.
+The savings are dramatic: about 5,000 tokens for 30 servers instead of 134,000. That's an 85 percent reduction in context usage. And it directly protects the cache boundary from SLIDE 38 — tool names are small and stable, so they stay in the static prefix. Full schemas are dynamic, so they load into the dynamic suffix only when needed.
 
 Design Decision 22: Load tool names eagerly, load full schemas lazily. This is the same idea as dynamic linking in operating systems — load the capability list at startup, but only load the actual code when it's called.
 
 ---
 
-## SLIDE 48 — Section Divider: UX, State & Streaming
+## SLIDE 60 — Section Divider: UX, State & Streaming
 
 Part eleven — UX, State, and Streaming. Six minutes. Latency is architecture, not polish.
 
 ---
 
-## SLIDE 49 — Latency Budget
+## SLIDE 61 — Latency Budget
 
 Why does latency matter for a coding agent? Because if the agent feels slow, developers stop using it and go back to doing things manually. Speed isn't polish — it's whether the product gets adopted. So every layer in the architecture has a latency target.
 
@@ -661,7 +745,7 @@ Four targets:
 The key insight: these aren't nice-to-have polish targets. They drove real architecture decisions — the custom TUI, the streaming pipeline, the parallel tool calls, the model routing that picks the fastest model for simple tasks. Every one of those exists because of a latency requirement.
 ---
 
-## SLIDE 50 — Interactive vs Headless
+## SLIDE 62 — Interactive vs Headless
 
 Remember, we said Claude Code works in two completely different modes — interactive and headless? Same agent loop, same tools, same model — but two opposite user experiences. Now let's look at what that actually means for the architecture.
 
@@ -683,13 +767,13 @@ And here's why this matters for the future: if tomorrow you wanted to add a thir
 
 ---
 
-## SLIDE 51 — Section Divider: Eval & Observability
+## SLIDE 63 — Section Divider: Eval & Observability
 
 Part twelve — Eval and Observability. Six minutes. You can't ship what you can't measure.
 
 ---
 
-## SLIDE 52 — Evaluation Strategy
+## SLIDE 64 — Evaluation Strategy
 
 How do you test a system that gives a different answer every time? Remember, non-deterministic output? Which means the same input can produce different but valid results. You can't write a traditional unit test that says "expect this exact output." So you need a different approach.
 
@@ -711,7 +795,7 @@ Now here's the honest part: the April 2026 quality regression — the one we'll 
 
 ---
 
-## SLIDE 53 — Three Layers of Telemetry
+## SLIDE 65 — Three Layers of Telemetry
 
 Evals tell you whether the system is good enough to ship. Telemetry tells you what's actually happening after you ship. You need both — and telemetry is the one that catches the problems evals missed.
 
@@ -727,13 +811,13 @@ The rule is simple: you can't debug what you can't measure. And in a non-determi
 
 ---
 
-## SLIDE 54 — Section Divider: Production Reality
+## SLIDE 66 — Section Divider: Production Reality
 
 Part thirteen — Production Reality. Five minutes. Every elegant design exists because something broke first.
 
 ---
 
-## SLIDE 55 — Three Real Incidents
+## SLIDE 67 — Three Real Incidents
 
 This section is the reason I saved production incidents for the end — because now you have enough context to actually understand what went wrong and why. Every architecture decision we covered exists because something broke first. Here are three real incidents, each one directly tied to a design decision we already made.
 
@@ -749,7 +833,7 @@ That's the honest truth about production systems: the architecture diagram is cl
 
 ---
 
-## SLIDE 56 — Honest Weaknesses
+## SLIDE 68 — Honest Weaknesses
 
 We just covered three incidents. Now let's be honest about what's still not right. Six things the team would reconsider if starting over.
 
@@ -769,13 +853,13 @@ Why share these openly? Because credibility comes from honesty. A system that cl
 
 ---
 
-## SLIDE 57 — Section Divider: Synthesis & Close
+## SLIDE 69 — Section Divider: Synthesis & Close
 
 Part fourteen — Synthesis and Close. Eight minutes. All 22 decisions, mapped to the architecture you started with.
 
 ---
 
-## SLIDE 58 — 22 Decisions Mapped to 5 Layers
+## SLIDE 70 — 22 Decisions Mapped to 5 Layers
 
 This is the payoff slide. Remember the five-layer architecture? Now every layer has its design decisions filled in.
 
@@ -783,7 +867,7 @@ Twenty-two decisions, five layers, one diagram. Now, here's your homework — an
 
 ---
 
-## SLIDE 59 — Six Transferable Principles
+## SLIDE 71 — Six Transferable Principles
 
 We covered 22 decisions specific to Claude Code. But six of those decisions are bigger than Claude Code — they apply to any agentic system you build. These are the patterns that transfer.
 
@@ -803,7 +887,7 @@ These six principles aren't Claude Code-specific. If you're building a coding ag
 
 ---
 
-## SLIDE 60 — Role-Based Questions
+## SLIDE 72 — Role-Based Questions
 
 Screenshot this slide. Seriously — take a photo right now. These are the questions you should bring to your next planning meeting, organized by role. Five questions each.
 
@@ -841,13 +925,13 @@ For Product Managers:
 
 ---
 
-## SLIDE 61 — Q&A + What's Next
+## Q&A — (verbal segment; no slide)
 
 Let's open the floor. Four questions to get you started. Are you building an agent at work? Have you shipped MCP yet? What's your stance on bypass mode? Which design decision surprised you most? And if you want to go deeper — Interview Kickstart's AI Systems Track has over 700 FAANG instructors, live cohorts with one-on-one mocks, and in the EdgeUp program you actually build a real agent. That's the agent-focused tier.
 
 ---
 
-## SLIDE 62 — Thank You / Close
+## SLIDE 73 — Thank You / Close
 
 You just designed Claude Code. Now go build your own agent. Three next steps: one — book a free strategy session with an IK advisor. Two — mention this masterclass for priority enrollment. Three — stay tuned for the next masterclass. Thank you all.
 

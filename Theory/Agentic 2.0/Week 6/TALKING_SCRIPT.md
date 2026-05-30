@@ -368,37 +368,61 @@ The key insight: **the loop is structurally identical regardless of which model 
 
 ---
 
-## Slide 21 — MCP Primitives & Content Types: Four Primitives, Three Content Types
+## Slide 21 — MCP Primitives & Content Types
 
-> *Top table — four primitives: Tool (model invokes with arguments, @mcp.tool(), side-effecting action with parameters); Resource (host fetches by URI, @mcp.resource("scheme://path"), read-only document static or computed); Prompt (host selects template, @mcp.prompt("name"), parameterized reusable instructions); Sampling (server asks host to call LLM, host-side capability, server needs LLM reasoning without holding API keys). Note: tools are 90% of usage. Bottom table — three content types: TextContent (most common, tool results); ImageContent (charts, screenshots); EmbeddedResource (references to stored data).*
+> *MCP primitives organized by layer. Server-side (3): Tools (model-controlled, executable functions), Resources (app-controlled, read-only data), Prompts (user-controlled, reusable templates). Client-side (3): Sampling (server-initiated LLM generation), Elicitation (server asks user for input/confirmation), Logging (diagnostic stream from server to host). Experimental: Tasks (durable async execution wrappers). Content types (3): TextContent, ImageContent, EmbeddedResource. Note: Tools are 90% of daily usage — the rest are capabilities you reach for when the situation fits.*
 
-"MCP is more than just tools. There are **four primitives** total. Tools are 90% of what you'll use, but you should know the other three exist.
+"MCP's primitives are organized into **three layers** — server-side, client-side, and experimental — plus **three content types** for tool results. Let me walk through each one with a concrete dev example.
 
-Let me give you one analogy that covers all four, and then we'll go through each one. Imagine we're replacing a human real-estate agent with an AI agent. Think about everything a human agent has access to when they walk into a negotiation meeting — and ask yourself: *where does each of those things come from in MCP?*
+### Server-Side Primitives — What the Server Exposes
 
-**A tool is a phone call you make *during* the meeting.** *'Hold on — let me call my office right now and look up what houses on this street sold for last month.'* You decide *when* to call. You decide *what* to ask. The answer comes back and changes what you say next. That's `@mcp.tool()` — the LLM picks it, the LLM provides the arguments, the result feeds back into the conversation. In our codebase, `get_market_price` and `calculate_discount` are tools. The agent calls them mid-negotiation to ground its offers in real data.
+These three are the core of MCP. The server provides them; the host/client/model consumes them.
 
-**A resource is the folder of documents your assistant printed and left on the table *before* the meeting.** Recent sale prices of nearby houses. The neighborhood rules. The home inspection checklist. You didn't ask for them mid-meeting — they were *pre-loaded* for you, sitting there as background context. That's `@mcp.resource("inventory://floor-prices")` — the host fetches the JSON catalog once, injects it into the agent's context, and it's just *there* for the entire conversation. The key difference from a tool: **the agent doesn't call a resource. The host provides it.** Think of it as *context the agent always has* versus *tools the agent might call*.
+**Tools — model-controlled executable functions.** The LLM reads the tool's description and dynamically decides *when* to invoke it, provides typed arguments, and the result feeds back into its reasoning. Tools can be state-changing — sending an email, writing to a database — not just reads. That's `@mcp.tool()` → `tools/call`. *Example:* a `fetch_webpage(url)` tool — when a user asks the AI to analyze an online article, the model automatically triggers this tool, executes the HTTP request, and reads the text back.
 
-**A prompt is a strategy card your boss hands you *before* you walk into the meeting — not data, but *instructions on how to behave*.** Your manager hands you a card: *'When the market is hot, start low and back it up with how long the house has been sitting unsold.'* That card doesn't contain any numbers or facts — it tells you *what to do*. You don't write the card — you *pick* one from the shelf, fill in the blanks (property address, market condition), and it becomes your game plan. That's `@mcp.prompt("negotiation-tactics")` — the host selects it with `role=buyer, market_condition=hot`, the server renders a fully parameterized instruction block, and it goes straight into the system prompt. **A tool gives you facts; a prompt tells you how to act on them.** Prompts are *user-discovered, not LLM-discovered* — the user or host picks them from a menu, not the model.
+**Resources — application-controlled, read-only data.** File paths, git history, database schemas — structured context the host fetches once and injects into the agent's context window. **Key difference from a tool: the agent doesn't call a resource — the host provides it. And resources are read-only — no side effects, no execution risk.** Context you *always have* versus tools you *might call*. *Example:* `postgres://database/schema` — the server exposes the database structure as a static text resource, and the AI reads it to understand table layouts before writing a SQL query.
 
-**Sampling is the reverse direction — the server asks the host to run something through the LLM.** Say the inspection-report server has a 50-page raw report. Instead of dumping all 50 pages into the agent's context, the server asks the host: *'Run this through your LLM with the prompt "list the top 3 risks" and send me back the result.'* The host runs it, returns a short summary, and the server includes *that* in its tool response instead of the full 50 pages. The server got LLM processing without holding its own API key — **only the host holds keys**, servers stay credential-free.
+**Prompts — user-controlled reusable templates.** Pre-set instruction templates, system prompts, or few-shot examples that the server exposes and the *user* (not the model) explicitly selects. You pick one from a menu, fill in the parameters, and it becomes the agent's game plan. **Tools give facts. Prompts shape behavior.** Prompts are *user-discovered*, not *LLM-discovered*. *Example:* a `/review-code` prompt — selecting it pre-fills the AI chat with a strict system instruction: *'Act as a senior engineer and check this code for security vulnerabilities.'*
 
-**Honest caveat: sampling is the least-used MCP primitive.** It's in the spec, but most servers today just return raw data and let the agent's LLM handle the reasoning. You'll likely never implement sampling in this course — but knowing it exists matters because it explains a design question you'd otherwise ask: *'Why can't the server just call OpenAI directly?'* It *can* — but sampling lets you centralize all API keys in the host, which is cleaner for security and billing. That's the architectural argument, even if few servers use it yet.
+### Client-Side Primitives — What the Client Exposes Back
 
-Here's how to remember all four. **Tool** — *I call you during the meeting for facts.* **Resource** — *you left documents on my desk before the meeting.* **Prompt** — *you told me how to behave before the meeting.* **Sampling** — *you called me and asked me to think for you.* Four primitives, four directions, one protocol.
+These go the *other direction* — the server reaches back into the host to leverage capabilities it doesn't own.
 
-The takeaway: **tools are 90% of MCP usage.** Resources, prompts, and sampling are capabilities you reach for when the situation fits — but knowing they exist puts you ahead of most people using MCP today.
+**Sampling — server-initiated LLM generation.** The server asks the host's LLM to generate text or handle a sub-task. **Keys stay centralized in the host** — the server gets LLM reasoning without running its own SDK or holding API credentials. In practice, sampling is lightly used today — most servers return raw data and let the agent's own LLM handle reasoning — but the architectural argument is clean: centralized credentials and billing. *Example:* a GitHub MCP server is processing an issue via a tool. Instead of packing its own LLM, it sends a request back to the client: *'Use your connected LLM to summarize this 50-line error log for me.'*
 
-Now — the bottom table on this slide is **content types — what a tool can *return*.** Three shapes.
+**Elicitation — explicit user confirmation loops.** A security gate that pauses operations to ask the user for permission, clarification, or extra input. Elicitation gives the server a safe, structured pathway to request supplementary user input or direct permission before carrying out sensitive operations. The server can't just act; it has to ask the human first. *Example:* an AWS management tool requests a command execution. The client intercepts and displays a pop-up: *'The AI wants to delete this server instance. Do you approve? [Yes / No]'*
 
-**`TextContent`** — the most common. Plain text or JSON. That's what `get_market_price` returns — a dict serialized as text. The host feeds it to the LLM as conversation history.
+**Logging — diagnostic stream forwarding.** A stream that forwards live diagnostic and debugging information from the server to the client — log levels, timestamps, contextual messages — so the host can surface them in a monitoring UI. Not glamorous, but essential for debugging MCP servers in production. *Example:* while a file-search tool scans a massive drive, the server streams live updates like `[DEBUG] Scanning directory /Users/documents...` so the user can track progress in their terminal.
 
-**`ImageContent`** — base64-encoded image data plus a mime type like `image/png`. Useful when a tool generates a chart, a screenshot, or an OCR'd document. The host can render it in the UI; vision models can also reason over it.
+### Experimental Primitives
 
-**`EmbeddedResource`** — a *reference* to a resource the host can dereference on demand. Instead of inlining a 50-page PDF, the tool returns a URI like `file:///report.pdf` — the host fetches it only if needed. This keeps context windows small.
+**Tasks — durable async execution wrappers.** Some tool calls take minutes, not milliseconds — batch processing, long-running computations, multi-step workflows. Tasks let the client fire off work, get a task ID back, and poll for status later. Think of it as the job-queue pattern applied to MCP. Still experimental in the spec, but it signals where MCP is headed: agents that kick off work and check back, rather than blocking on every call. *Example:* a video transcoding tool. Instead of hanging the connection, the server immediately returns `task_id: "tx-987"`. The client periodically polls this ID to check if the rendering is finished.
 
-The protocol standardizes these return blocks so the host always knows what shape to expect — text in a code block, images in an `<img>` tag, embedded resources as expandable links. **No guessing, no parsing — typed content blocks all the way down.** And this pattern carries forward: A2A in Module 2 uses the same idea with `TextPart`, `FilePart`, and `DataPart`. Once you see typed content in MCP, you see it everywhere."
+### The Summary Table
+
+| Primitive | Layer | Controlled by | One sentence |
+|---|---|---|---|
+| **Tool** | Server | Model | *Model invokes a function for facts or actions.* |
+| **Resource** | Server | Application | *Host fetches read-only data into context.* |
+| **Prompt** | Server | User | *User selects a template that shapes agent behavior.* |
+| **Sampling** | Client | Server → Host | *Server asks the host LLM to generate text.* |
+| **Elicitation** | Client | Server → User | *Server pauses and asks the human for permission.* |
+| **Logging** | Client | Server → Host | *Server streams diagnostic info to the host.* |
+| **Tasks** | Experimental | Client | *Client kicks off a long job and polls for status.* |
+
+**Tools are 90% of daily MCP usage.** Resources and Prompts are the next most common. The client-side primitives and Tasks are capabilities you reach for when the situation fits — but knowing the full landscape puts you ahead of most people using MCP today.
+
+### The Three Content Types
+
+When a tool returns a result, what *shape* does it take? MCP standardizes three content blocks so the host never has to guess.
+
+**`TextContent`** — the workhorse. Plain text or JSON. `get_market_price` returns a dict serialized as text — the host feeds it to the LLM as conversation history. This is 95% of what you'll see.
+
+**`ImageContent`** — base64-encoded image data plus a MIME type. A charting tool returning a PNG, or an OCR tool returning a scanned document. Vision models can reason over it; the host can render it in the UI.
+
+**`EmbeddedResource`** — a URI reference the host can dereference on demand. Instead of inlining a 50-page PDF, the tool returns `file:///report.pdf` — the host fetches it only if needed. Keeps context windows small.
+
+**Why this matters:** typed content blocks mean no parsing, no guessing, no regex. The host reads the `type` field and knows exactly how to render or forward the result. And this pattern carries directly into Module 2 — A2A uses the same idea with `TextPart`, `FilePart`, and `DataPart`. Once you see typed content blocks in MCP, you'll recognize them everywhere."
 
 ---
 

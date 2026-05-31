@@ -428,17 +428,89 @@ When a tool returns a result, what *shape* does it take? MCP standardizes three 
 
 ## Slide 22 — Three Transports: stdio, SSE, Streamable HTTP
 
-> *Three rows. stdio — subprocess pipes, lowest latency, used for local dev/integration tests/single-tenant desktop apps. SSE — server-sent events over HTTP, legacy, single-tenant deployments with two endpoints (/sse + /messages). Streamable HTTP — HTTP with chunked SSE response body, multi-tenant deployments, streaming on same connection, replaces SSE. Same protocol, different carrier — switch with a runtime flag.*
+> *MCP is transport-agnostic — same JSON-RPC 2.0 protocol, different wire. Three modes: stdio (local subprocess, stdin/stdout pipes), SSE (legacy HTTP, dual-endpoint /sse + /messages), Streamable HTTP (modern, single /mcp endpoint, replaces SSE). All transports frame three JSON-RPC payload types: Requests (id + method + params, require response), Responses (result or error mapped to request id), Notifications (method + params, no id, fire-and-forget). Comparison table: stdio is local-only, zero latency, OS-level security; SSE/Streamable HTTP are remote-capable, standard HTTP overhead, require HTTPS/API keys. Streamable HTTP is the spec's recommended production transport.*
 
-"Transports — how the bytes physically move between client and server. **Same protocol, different carrier.** Three options.
+"Transports — how the bytes physically move between client and server. The core protocol is **completely agnostic** to the wire — it just needs a channel that can carry JSON-RPC 2.0 messages. MCP implements three foundational transports to fit different deployment shapes.
 
-**stdio** — *standard input and standard output*. The host **spawns the server as a subprocess**. Bytes flow through pipes. **Lowest latency** — no network round trip, just process IPC. Use it for local development, integration tests, and single-tenant desktop apps. Claude Desktop talks to most of its MCP servers this way. The pricing server in our codebase, when called from `adk web`, runs over stdio.
+### stdio — Standard Input/Output
 
-**SSE — Server-Sent Events.** This is the legacy HTTP-based transport. Server runs as a long-lived HTTP server, exposes two endpoints — `/sse` for streaming responses, `/messages` for request payloads. **Use it when you need network reach** — for example, when the server is on a different machine than the client. Single-tenant deployments work fine; multi-tenant gets awkward because each client needs its own SSE stream.
+The client launches the MCP server as a **local child process**. The client writes JSON-RPC messages to the server's `stdin`; the server writes responses back to the client's `stdout`. No network involved — pure process IPC. **Lowest latency, zero network overhead.** Security relies on local OS permissions. Use it for local desktop apps, IDE extensions (VS Code, Claude Desktop), CLI utilities, and integration tests. The pricing server in our codebase, when called from `adk web`, runs over stdio.
 
-**Streamable HTTP** — the spec's *recommended replacement* for raw SSE. Single endpoint. HTTP with a chunked SSE response body. Streaming and request-response on the same connection. **Multi-tenant friendly.** This is what new MCP servers should use.
+### SSE — Server-Sent Events (Legacy)
 
-Look at the bottom-left code snippet. *Same FastMCP server*, three different ways to run it: `mcp.run()` for stdio, `mcp.run(transport="sse")` for SSE, `mcp.run(transport="streamable-http")` for the new one. **Same code, runtime flag.** That's the point — the protocol is decoupled from the carrier. You write your server once, deploy it however the host needs."
+First, what *is* SSE? **Server-Sent Events** is a browser/HTTP standard where the server keeps a connection open and continuously pushes text messages down to the client — like a one-way radio. The client listens; the server talks. It's built into every browser and every HTTP library, so it's easy to adopt.
+
+In MCP's SSE transport, the architecture has **two endpoints** — two separate URLs the client talks to:
+
+- **`/sse`** — the client opens a **long-lived connection** here. 'Long-lived' means the HTTP request never completes — the connection stays open for minutes or hours, and the server pushes messages down it whenever it has something to say. This is how the server sends results, notifications, and streaming data *to* the client.
+- **`/messages`** — when the *client* needs to send something *to* the server (a tool call, a request), it sends a standard HTTP POST to this second URL.
+
+So the data flows in two different directions on two different URLs. That's the **dual-endpoint** pattern.
+
+**Why is this 'legacy'?** Three friction points:
+
+- **Persistent server state.** That long-lived `/sse` connection means the server has to remember *which client is on which connection* for the entire session. The server can't just handle a request and forget about it — it has to hold state in memory. That makes it incompatible with **serverless platforms** (AWS Lambda, Cloud Run) where your code spins up, handles one request, and shuts down.
+- **Awkward multi-tenant scaling.** 'Multi-tenant' means multiple clients sharing the same server. With SSE, each client holds its own persistent connection — so a server with 1,000 clients has 1,000 open connections consuming memory. Scaling this requires sticky sessions on your **load balancer** (the infrastructure that distributes incoming traffic across multiple server instances), which adds complexity.
+- **Dual-endpoint routing.** Having two URLs means your **proxy** (the middleman server that forwards requests) and your load balancer both need to know about *both* endpoints and route them correctly. More configuration, more things to break.
+
+Use SSE only if you're connecting to an existing SSE-based server that hasn't migrated yet. **New servers should use Streamable HTTP instead.**
+
+### Streamable HTTP — The Modern Replacement
+
+Introduced in the March 2025 spec update, Streamable HTTP **completely supersedes SSE** as the recommended network transport. It collapses the two-endpoint SSE model into something that looks and behaves like a normal web API.
+
+**Single endpoint.** All traffic flows through one path (e.g., `https://example.com/mcp`). Client requests go to that URL via POST. Server responses come back from that same URL. No second endpoint to configure, route, or debug.
+
+**Flexible responses.** This is the clever part. The server decides *per-request* how to respond:
+
+- For fast, synchronous tasks — say, returning a cached price — the server sends back a normal JSON response. The HTTP header says `Content-Type: application/json` (which just tells the client *'this body is JSON, parse it as such'*).
+- For long-running or streaming tasks — say, generating a report chunk by chunk — the server *upgrades* the response to `Content-Type: text/event-stream`. That header tells the client *'I'm going to keep this connection open and send you a stream of events.'* Same endpoint, same URL — the server just picks a different response format based on the situation.
+
+Request-response and streaming coexist on one URL without separate infrastructure. That's the whole architectural win.
+
+**Why MCP switched — four reasons:**
+
+- **Stateless infrastructure support.** 'Stateless' means the server doesn't have to remember anything between requests — it handles a request, responds, and forgets. This is how **serverless platforms** work: AWS Lambda spins up a function, handles one request, and shuts down. Cloud Run and Cloudflare Workers do the same. SSE's persistent connections *forced* the server to hold state, which made serverless impossible. Streamable HTTP doesn't force that — so your MCP server can run on Lambda, Cloud Run, or Workers with zero changes.
+
+- **Enterprise-friendly.** All traffic is standard POST/GET over HTTPS — the same shape as every other web API in your company. That matters because:
+  - **Firewalls** can inspect the payloads (they're just JSON in HTTP bodies — nothing exotic).
+  - **CORS policies** apply cleanly. CORS ('Cross-Origin Resource Sharing') is the browser's security rule that controls which websites can call which APIs. Standard HTTP endpoints get standard CORS handling — no special exceptions needed.
+  - **Auth headers** work normally — `Authorization: Bearer <token>` in every request, same as any REST API.
+  - **Zero-trust networks** are happy. 'Zero-trust' is the enterprise security model where *nothing is trusted by default* — every request must prove its identity and authorization, even inside the corporate network. Standard HTTP with standard auth headers fits this model perfectly. Exotic long-lived SSE connections often don't.
+
+- **Connection resumability.** Every stream the server sends includes a unique tracking ID on each event. If the client loses connection mid-stream — network hiccup, laptop goes to sleep, Wi-Fi drops — the client reconnects and sends a `Last-Event-ID` header with the last ID it received. The server picks up *exactly where it left off*. No data loss, no replaying the entire conversation. Think of it like a bookmark in a book — you don't start over from page 1.
+
+- **Simplified middleware.** **Middleware** is the infrastructure sitting between clients and servers — load balancers (distribute traffic across server instances), **API gateways** (the front door that handles auth, rate limiting, and routing before requests hit your servers), and reverse proxies (forward requests on behalf of clients). All of these were designed for standard HTTP. They treat a Streamable HTTP MCP server like any other web API — no custom SSE configuration, no sticky-session hacks, no special timeout tuning for long-lived connections.
+
+### The Wire Format — Same Across All Three
+
+Regardless of transport, every MCP message is a **JSON-RPC 2.0** frame in one of three shapes:
+
+| Type | Has `id`? | Direction | Purpose |
+|---|---|---|---|
+| **Request** | Yes | Either → Either | Carries `method` + `params`. Requires a matching Response. |
+| **Response** | Yes (matches Request) | Either → Either | Returns `result` or `error`, mapped back to the Request's `id`. |
+| **Notification** | No | Either → Either | One-way `method` + `params`. Fire-and-forget — no response expected. |
+
+We saw this in Demo 01's handshake: `initialize` had `id: 1` → server replied with `id: 1`. `notifications/initialized` had *no `id`* → no reply. **Same framing on stdio, SSE, or Streamable HTTP.**
+
+### Transport Comparison
+
+| Feature | stdio | SSE (Legacy) | Streamable HTTP |
+|---|---|---|---|
+| **Locality** | Local machine only | Remote over network | Remote over network |
+| **Endpoints** | stdin/stdout pipes | Two (`/sse` + `/messages`) | One (`/mcp`) |
+| **Process lifecycle** | Client controls (subprocess) | Managed independently | Managed independently |
+| **Network overhead** | Zero | Standard HTTP | Standard HTTP |
+| **Serverless compatible** | N/A | No (persistent state) | Yes |
+| **Connection resumability** | N/A | No | Yes (`Last-Event-ID`) |
+| **Security scope** | Local OS permissions | HTTPS / API keys | HTTPS / API keys |
+| **Multi-tenant** | No (1:1) | Awkward | Native |
+| **Spec status** | Supported | Legacy | **Recommended** |
+
+### The Punchline
+
+Look at the code. *Same FastMCP server*, three different ways to run it: `mcp.run()` for stdio, `mcp.run(transport="sse")` for SSE, `mcp.run(transport="streamable-http")` for Streamable HTTP. **Same code, runtime flag.** The protocol is decoupled from the carrier. You write your server once, deploy it however the host needs."
 
 ---
 
